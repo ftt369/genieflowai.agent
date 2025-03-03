@@ -1,0 +1,315 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import './animations.css';
+
+@layer base {
+  :root {
+    --accent-color: #3b82f6;
+    
+    /* Light theme - brighter colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: var(--accent-color);
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: var(--accent-color);
+
+    /* Animation durations */
+    --theme-transition-duration: 0.3s;
+    --theme-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Fix background color application */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  .dark {
+    /* Dark theme - darker colors */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: var(--accent-color);
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: var(--accent-color);
+
+    /* Fix background color application */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html,
+  body {
+    @apply min-h-screen;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  body {
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+                color var(--theme-transition-duration) var(--theme-transition-timing);
+  }
+
+  /* Enhanced transitions for common elements */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition: all var(--theme-transition-duration) var(--theme-transition-timing);
+  }
+
+  /* Smooth border transitions */
+  .border,
+  .border-t,
+  .border-r,
+  .border-b,
+  .border-l {
+    transition: border-color var(--theme-transition-duration) var(--theme-transition-timing);
+  }
+
+  /* Smooth background transitions */
+  .bg-primary,
+  .bg-secondary,
+  .bg-accent,
+  .bg-muted {
+    transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+  }
+
+  /* Smooth text color transitions */
+  .text-primary,
+  .text-secondary,
+  .text-accent,
+  .text-muted {
+    transition: color var(--theme-transition-duration) var(--theme-transition-timing);
+  }
+}
+
+/* Theme gradient overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--gradient);
+  opacity: var(--fade-opacity);
+  pointer-events: none;
+  z-index: 50;
+  mix-blend-mode: overlay;
+}
+
+/* Custom color utilities */
+.text-gradient {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-gradient {
+  background: var(--gradient);
+}
+
+.border-gradient {
+  border-image: var(--gradient) 1;
+}
+
+/* Smooth theme transition */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+.dark::view-transition-old(root) {
+  z-index: 2;
+}
+.dark::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+  transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  @apply rounded-full opacity-50 hover:opacity-75;
+  transition: all var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  transition: outline-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* Selection styles */
+::selection {
+  background: var(--accent-color);
+  @apply text-white opacity-75;
+  transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+/* Animations */
+@keyframes glow {
+  0%, 100% { opacity: var(--fade-opacity); }
+  50% { opacity: calc(var(--fade-opacity) * 1.5); }
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Loading animation */
+@keyframes loading-dots {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+.loading-dots > span {
+  @apply inline-block w-2 h-2 mx-0.5 rounded-full;
+  background: var(--accent-color);
+  animation: loading-dots 1.4s infinite;
+  transition: background-color var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+.loading-dots > span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots > span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Auto-growing textarea */
+textarea {
+  min-height: 44px;
+  transition: height 0.2s ease;
+}
+
+/* Message transitions */
+.message-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.message-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.message-exit {
+  opacity: 1;
+}
+
+.message-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* Loading dots animation */
+.loading-dots:after {
+  content: '.';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60% { content: '...'; }
+  80%, 100% { content: ''; }
+}
+
+/* Hover effects */
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+  --tw-ring-color: var(--accent-color);
+  --tw-ring-offset-color: var(--background);
+}
+
+/* Theme transition overlay */
+.theme-transition-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  background: radial-gradient(circle at center, var(--accent-color) 0%, transparent 100%);
+  transition: opacity var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+.theme-changing .theme-transition-overlay {
+  opacity: 0.1;
+}
+
+/* Shimmer effect for loading states */
+.shimmer {
+  @apply relative overflow-hidden;
+}
+
+.shimmer::before {
+  @apply absolute inset-0;
+  content: '';
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--accent-color), 0.1) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.5s infinite;
+} 

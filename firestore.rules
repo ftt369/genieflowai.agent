@@ -1,0 +1,136 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function hasRole(role) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isHipaaCompliant(data) {
+      return data.hipaaCompliant == true 
+        && data.lastEncrypted != null 
+        && data.encryptedFields != null;
+    }
+
+    function hasValidAuthorization(resourceType, resourceId) {
+      let auth = get(/databases/$(database)/documents/authorizations/$(request.auth.uid)).data;
+      return auth != null && auth[resourceType] != null && auth[resourceType][resourceId] != null;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || hasRole('admin'));
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isAuthenticated() && isOwner(userId);
+      allow delete: if false; // Prevent deletion for HIPAA compliance
+    }
+
+    // PHI (Protected Health Information) collection
+    match /phi/{documentId} {
+      allow read: if isAuthenticated() 
+        && hasValidAuthorization('phi', documentId)
+        && hasRole('medical_staff');
+      allow create: if isAuthenticated() 
+        && hasRole('medical_staff')
+        && isHipaaCompliant(request.resource.data);
+      allow update: if isAuthenticated() 
+        && hasRole('medical_staff')
+        && isHipaaCompliant(request.resource.data)
+        && hasValidAuthorization('phi', documentId);
+      allow delete: if false; // Prevent deletion for HIPAA compliance
+    }
+
+    // Audit logs collection
+    match /phi_access_logs/{logId} {
+      allow read: if isAuthenticated() && hasRole('compliance_officer');
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Prevent modification of audit logs
+    }
+
+    // Authorizations collection
+    match /authorizations/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || hasRole('admin'));
+      allow write: if isAuthenticated() && hasRole('admin');
+    }
+
+    // Emergency access logs
+    match /emergency_access_logs/{logId} {
+      allow read: if isAuthenticated() && hasRole('compliance_officer');
+      allow create: if isAuthenticated() && hasRole('medical_staff');
+      allow update, delete: if false;
+    }
+
+    // Data retention policies
+    match /retention_policies/{policyId} {
+      allow read: if isAuthenticated() && hasRole('compliance_officer');
+      allow write: if isAuthenticated() && hasRole('compliance_officer');
+    }
+
+    // Agents collection with PHI handling
+    match /agents/{agentId} {
+      allow read: if isAuthenticated() 
+        && (resource.data.containsPHI == false || hasValidAuthorization('agents', agentId));
+      allow create: if isAuthenticated() 
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow update: if isAuthenticated() 
+        && (!resource.data.containsPHI || hasRole('medical_staff'))
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow delete: if false; // Prevent deletion for HIPAA compliance
+    }
+
+    // Workflows with PHI handling
+    match /workflows/{workflowId} {
+      allow read: if isAuthenticated() 
+        && (resource.data.containsPHI == false || hasValidAuthorization('workflows', workflowId));
+      allow create: if isAuthenticated() 
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow update: if isAuthenticated() 
+        && (!resource.data.containsPHI || hasRole('medical_staff'))
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow delete: if false; // Prevent deletion for HIPAA compliance
+    }
+
+    // Knowledge bases with PHI handling
+    match /knowledge_bases/{baseId} {
+      allow read: if isAuthenticated() 
+        && (resource.data.containsPHI == false || hasValidAuthorization('knowledge_bases', baseId));
+      allow create: if isAuthenticated() 
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow update: if isAuthenticated() 
+        && (!resource.data.containsPHI || hasRole('medical_staff'))
+        && (!request.resource.data.containsPHI || hasRole('medical_staff'));
+      allow delete: if false; // Prevent deletion for HIPAA compliance
+    }
+
+    // Workflow executions collection
+    match /workflow_executions/{executionId} {
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+
+    // Teams collection
+    match /teams/{teamId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.members[request.auth.uid] != null);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (resource.data.members[request.auth.uid].role in ['owner', 'admin']);
+      allow delete: if isAuthenticated() && 
+        resource.data.members[request.auth.uid].role == 'owner';
+    }
+  }
+} 
