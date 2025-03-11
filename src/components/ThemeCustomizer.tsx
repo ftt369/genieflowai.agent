@@ -1,60 +1,52 @@
-import { useState } from 'react';
-import { Palette } from 'lucide-react';
-import { useThemeStore } from '../store/themeStore';
+import React from 'react';
+import { useThemeStore } from '../stores/theme/themeStore';
+import ColorPalette from './ColorPalette';
+import ThemeAnimationControls from './ThemeAnimationControls';
+import ThemeScheduler from './ThemeScheduler';
+import ThemeSharing from './ThemeSharing';
+import GradientControls from './GradientControls';
 
-export default function ThemeCustomizer() {
-  const { accentColor, setAccentColor } = useThemeStore();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const colors = [
-    '#3b82f6', // blue
-    '#10b981', // green
-    '#f59e0b', // yellow
-    '#ef4444', // red
-    '#8b5cf6', // purple
-    '#ec4899', // pink
-  ];
+const ThemeCustomizer: React.FC = () => {
+  const { currentTheme, updateTheme } = useThemeStore();
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 
-                  transition-all duration-300 relative overflow-hidden group"
-        aria-label="Customize theme"
-      >
-        <Palette className="w-5 h-5" style={{ color: accentColor }} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 animate-fade-in z-50">
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <Palette className="w-4 h-4" />
-              Theme Color
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setAccentColor(color)}
-                  className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${
-                    accentColor === color ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''
-                  }`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Set theme color to ${color}`}
-                />
-              ))}
-            </div>
-            <input
-              type="color"
-              value={accentColor}
-              onChange={(e) => setAccentColor(e.target.value)}
-              className="w-full h-8 rounded cursor-pointer mt-2"
-            />
-          </div>
+    <div className="space-y-6 p-4">
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Theme Customization</h2>
+        <div className="space-y-6">
+          <ColorPalette />
+          <ThemeAnimationControls />
+          <GradientControls />
+          <ThemeScheduler />
+          <ThemeSharing />
         </div>
-      )}
+      </div>
+      
+      <div className="space-y-4">
+        <h3 className="font-medium">Theme Settings</h3>
+        <div className="space-y-2">
+          <label className="flex items-center justify-between">
+            <span>Dark Mode</span>
+            <input
+              type="checkbox"
+              checked={currentTheme.mode === 'dark'}
+              onChange={(e) => updateTheme({ mode: e.target.checked ? 'dark' : 'light' })}
+              className="toggle"
+            />
+          </label>
+          <label className="flex items-center justify-between">
+            <span>System Theme</span>
+            <input
+              type="checkbox"
+              checked={currentTheme.followSystem}
+              onChange={(e) => updateTheme({ followSystem: e.target.checked })}
+              className="toggle"
+            />
+          </label>
+        </div>
+      </div>
     </div>
   );
-} 
+};
+
+export default ThemeCustomizer; 

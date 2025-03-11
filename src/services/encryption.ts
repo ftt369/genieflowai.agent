@@ -1,8 +1,12 @@
 import { AES, enc } from 'crypto-js';
+import CryptoJS from 'crypto-js';
 
 // We'll use a combination of server-side and client-side encryption
 // Server-side key will be managed through secure environment variables
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
+
+// Get encryption key from environment variable
+const clientEncryptionKey = import.meta.env.VITE_ENCRYPTION_KEY || 'default-dev-key';
 
 export const encryptionService = {
   // Encrypt sensitive data
@@ -57,4 +61,30 @@ export const encryptionService = {
     }
     return decrypted;
   },
-}; 
+};
+
+export function encrypt(text: string): string {
+  return CryptoJS.AES.encrypt(text, clientEncryptionKey).toString();
+}
+
+export function decrypt(encryptedText: string): string {
+  const bytes = CryptoJS.AES.decrypt(encryptedText, clientEncryptionKey);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
+
+// Function to generate a new encryption key (for admin use)
+export function generateEncryptionKey(): string {
+  return CryptoJS.lib.WordArray.random(32).toString();
+}
+
+// Utility function to test if encryption is working
+export function testEncryption(text: string): boolean {
+  try {
+    const encrypted = encrypt(text);
+    const decrypted = decrypt(encrypted);
+    return text === decrypted;
+  } catch (error) {
+    console.error('Encryption test failed:', error);
+    return false;
+  }
+} 

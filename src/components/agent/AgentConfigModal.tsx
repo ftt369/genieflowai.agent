@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Bot, Cpu, Zap, Clock, Activity, BarChart2, LineChart } from 'lucide-react';
 import { Agent, AgentType } from '../types/agent';
+import { ReportService, ReportConfig } from '../../services/reportService';
+import { modelServiceFactory } from '../../services/modelService';
 
 interface AgentConfigModalProps {
   agent: Agent | null;
@@ -16,9 +18,33 @@ const agentTypes: AgentType[] = [
   { id: 'analysis', label: 'Analysis', description: 'Analyze trends and patterns' }
 ];
 
+export interface AgentConfig {
+  name: string;
+  description?: string;
+  type: 'chat' | 'research' | 'report';
+  prompt: string;
+  settings?: {
+    style?: 'formal' | 'casual' | 'technical';
+    format?: 'detailed' | 'summary' | 'bullet-points';
+    sections?: string[];
+  };
+}
+
 export function AgentConfigModal({ agent, onClose, onSave }: AgentConfigModalProps) {
   const [editedAgent, setEditedAgent] = useState<Agent | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'advanced' | 'metrics'>('general');
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>({
+    name: '',
+    description: '',
+    type: 'chat',
+    prompt: '',
+    settings: {
+      style: 'formal',
+      format: 'detailed',
+      sections: ['Executive Summary', 'Introduction', 'Findings', 'Conclusion']
+    }
+  });
+  const [newSection, setNewSection] = useState('');
 
   useEffect(() => {
     if (agent) {
@@ -42,10 +68,52 @@ export function AgentConfigModal({ agent, onClose, onSave }: AgentConfigModalPro
 
   if (!editedAgent) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editedAgent) {
+      if (agentConfig.type === 'report') {
+        const reportService = new ReportService(modelServiceFactory.getService('gemini'));
+        // Save report agent configuration
+        // You can add specific handling for report agents here
+      }
       onSave(editedAgent);
       onClose();
+    }
+  };
+
+  const handleTypeChange = (type: 'chat' | 'research' | 'report') => {
+    setAgentConfig(prev => ({
+      ...prev,
+      type,
+      settings: type === 'report' ? {
+        style: 'formal',
+        format: 'detailed',
+        sections: ['Executive Summary', 'Introduction', 'Findings', 'Conclusion']
+      } : undefined
+    }));
+  };
+
+  const handleAddSection = () => {
+    if (newSection.trim() && agentConfig.settings?.sections) {
+      setAgentConfig(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings!,
+          sections: [...prev.settings!.sections!, newSection.trim()]
+        }
+      }));
+      setNewSection('');
+    }
+  };
+
+  const handleRemoveSection = (index: number) => {
+    if (agentConfig.settings?.sections) {
+      setAgentConfig(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings!,
+          sections: prev.settings!.sections!.filter((_, i) => i !== index)
+        }
+      }));
     }
   };
 
@@ -114,35 +182,40 @@ export function AgentConfigModal({ agent, onClose, onSave }: AgentConfigModalPro
                   <label className="text-sm font-medium">Name</label>
                   <input
                     type="text"
-                    value={editedAgent.name}
-                    onChange={(e) => setEditedAgent({ ...editedAgent, name: e.target.value })}
+                    value={agentConfig.name}
+                    onChange={(e) => setAgentConfig(prev => ({ ...prev, name: e.target.value }))}
                     className="w-full mt-1 p-2 rounded-md border border-input bg-background"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Task</label>
+                  <label className="text-sm font-medium">Description</label>
                   <textarea
-                    value={editedAgent.task}
-                    onChange={(e) => setEditedAgent({ ...editedAgent, task: e.target.value })}
+                    value={agentConfig.description || ''}
+                    onChange={(e) => setAgentConfig(prev => ({ ...prev, description: e.target.value }))}
                     className="w-full mt-1 p-2 rounded-md border border-input bg-background resize-none h-20"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Type</label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    {agentTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => setEditedAgent({ ...editedAgent, type: type.id as Agent['type'] })}
-                        className={`p-3 rounded-lg border text-left transition-colors
-                                ${editedAgent.type === type.id 
-                                  ? 'border-primary bg-primary/5' 
-                                  : 'border-input hover:border-primary'}`}
-                      >
-                        <div className="font-medium">{type.label}</div>
-                        <div className="text-sm text-muted-foreground">{type.description}</div>
-                      </button>
-                    ))}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleTypeChange('chat')}
+                      className={`flex-1 p-2 rounded-lg ${agentConfig.type === 'chat' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    >
+                      Chat Agent
+                    </button>
+                    <button
+                      onClick={() => handleTypeChange('research')}
+                      className={`flex-1 p-2 rounded-lg ${agentConfig.type === 'research' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    >
+                      Research Agent
+                    </button>
+                    <button
+                      onClick={() => handleTypeChange('report')}
+                      className={`flex-1 p-2 rounded-lg ${agentConfig.type === 'report' ? 'bg-primary text-white' : 'bg-muted'}`}
+                    >
+                      Report Agent
+                    </button>
                   </div>
                 </div>
               </div>

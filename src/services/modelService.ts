@@ -1,12 +1,13 @@
-import { ModelType } from '../stores/modelStore';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ModelType } from '@stores/model/modelStore';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { generateOpenAIResponse } from '../api/openai';
+import { usePromptStore } from '../stores/promptStore';
 
 // Get environment variables
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 export interface Message {
-  role: 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -14,11 +15,17 @@ export interface ModelConfig {
   apiKey?: string;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  stopSequences?: string[];
 }
 
 export interface ModelService {
   generateChat(messages: Message[]): Promise<string>;
+  generateChatStream(messages: Message[]): AsyncGenerator<string, void, unknown>;
   updateConfig(config: ModelConfig): void;
+  getCurrentModel(): string;
 }
 
 export class OpenAIService implements ModelService {
@@ -26,10 +33,26 @@ export class OpenAIService implements ModelService {
 
   async generateChat(messages: Message[]): Promise<string> {
     try {
-      const response = await generateOpenAIResponse(messages);
+      // Get proprietary prompt
+      const { proprietaryPrompt } = usePromptStore.getState();
+      
+      // Add proprietary prompts to the messages
+      const enhancedMessages: Message[] = [
+        { role: 'system', content: proprietaryPrompt.systemPrompt },
+        { role: 'system', content: proprietaryPrompt.contextPrompt },
+        ...messages
+      ];
+
+      const response = await generateOpenAIResponse(enhancedMessages);
       if (!response.success) {
         throw new Error(response.error || 'Failed to generate response');
       }
+
+      // Format response according to proprietary format if specified
+      if (proprietaryPrompt.responseFormat) {
+        return this.formatResponse(response.content, proprietaryPrompt.responseFormat);
+      }
+
       return response.content;
     } catch (error) {
       console.error('OpenAI Service Error:', error);
@@ -37,8 +60,80 @@ export class OpenAIService implements ModelService {
     }
   }
 
+  async *generateChatStream(messages: Message[]): AsyncGenerator<string, void, unknown> {
+    try {
+      // Get proprietary prompt
+      const { proprietaryPrompt } = usePromptStore.getState();
+      
+      // Add proprietary prompts to the messages
+      const enhancedMessages: Message[] = [
+        { role: 'system', content: proprietaryPrompt.systemPrompt },
+        { role: 'system', content: proprietaryPrompt.contextPrompt },
+        ...messages
+      ];
+
+      const stream = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey || import.meta.env.VITE_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-turbo-preview',
+          messages: enhancedMessages,
+          stream: true
+        })
+      });
+
+      const reader = stream.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Failed to create stream reader');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') break;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices[0]?.delta?.content;
+              if (content) {
+                yield content;
+              }
+            } catch (e) {
+              console.warn('Failed to parse streaming response:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('OpenAI Streaming Error:', error);
+      throw error;
+    }
+  }
+
+  private formatResponse(content: string, format: string): string {
+    // Apply response formatting based on the proprietary format
+    // This is a placeholder - implement your formatting logic here
+    return content;
+  }
+
   updateConfig(config: ModelConfig) {
     this.config = { ...this.config, ...config };
+  }
+
+  getCurrentModel(): string {
+    return 'gpt4';
   }
 }
 
@@ -48,7 +143,6 @@ export class GeminiService implements ModelService {
   private model: any = null;
 
   private initModel() {
-    // Use environment variable as fallback if no API key is configured
     const apiKey = this.config.apiKey || GEMINI_API_KEY;
     
     if (!apiKey) {
@@ -61,8 +155,10 @@ export class GeminiService implements ModelService {
         model: "gemini-2.0-flash",
         generationConfig: {
           temperature: this.config.temperature || 0.7,
-          maxOutputTokens: this.config.maxTokens || 1000,
-        },
+          maxOutputTokens: this.config.maxTokens || 8192,
+          topK: 40,
+          topP: 0.95,
+        }
       });
     } catch (error) {
       console.error('Failed to initialize Gemini:', error);
@@ -76,52 +172,100 @@ export class GeminiService implements ModelService {
     }
 
     try {
-      console.log('Received messages:', messages);
-      
-      // Validate messages array
-      if (!Array.isArray(messages)) {
-        throw new Error('Messages must be an array');
-      }
-
-      if (messages.length === 0) {
-        throw new Error('Please provide a message to send');
-      }
-
-      // Validate each message
-      const validMessages = messages.filter(msg => 
-        msg && 
-        typeof msg === 'object' && 
-        msg.role && 
-        msg.content && 
-        typeof msg.content === 'string'
-      );
-
-      if (validMessages.length === 0) {
-        throw new Error('No valid messages found');
-      }
-
-      // For single messages, use generateContent
-      if (validMessages.length === 1) {
-        const result = await this.model.generateContent(validMessages[0].content);
-        return result.response.text();
-      }
+      // Format messages for better continuity
+      const enhancedMessages = messages.map(msg => {
+        if (msg.role === 'system') {
+          return {
+            role: 'user',
+            content: `[System Instruction] ${msg.content}`
+          };
+        }
+        return msg;
+      });
 
       // For conversations, use chat
-      const chat = this.model.startChat();
+      const chat = this.model.startChat({
+        history: enhancedMessages.slice(0, -1).map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }))
+      });
       
-      // Send all messages in sequence
-      for (let i = 0; i < validMessages.length - 1; i++) {
-        const msg = validMessages[i];
-        console.log(`Processing message ${i}:`, msg);
-        await chat.sendMessage(msg.content);
+      // Send the last message and get the response
+      const lastMessage = enhancedMessages[enhancedMessages.length - 1];
+      const result = await chat.sendMessage(lastMessage.content);
+      
+      if (!result.response) {
+        throw new Error('No response from Gemini chat API');
       }
 
-      // Send the last message and get the response
-      const lastMessage = validMessages[validMessages.length - 1];
-      console.log('Last message:', lastMessage);
+      let response = result.response.text();
+
+      // Check if response was cut off
+      if (response.endsWith('...') || response.endsWith('…') || !response.trim().endsWith('.')) {
+        console.log('Response appears to be cut off, attempting to continue...');
+        const continuationResult = await chat.sendMessage('Please continue your previous response.');
+        if (continuationResult.response) {
+          response += '\n\n' + continuationResult.response.text();
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Gemini API Error:', error);
+      throw new Error(error instanceof Error ? error.message : 'Failed to generate response');
+    }
+  }
+
+  async *generateChatStream(messages: Message[]): AsyncGenerator<string, void, unknown> {
+    if (!this.model) {
+      this.initModel();
+    }
+
+    try {
+      // Format messages for better continuity
+      const enhancedMessages = messages.map(msg => {
+        if (msg.role === 'system') {
+          return {
+            role: 'user',
+            content: `[System Instruction] ${msg.content}`
+          };
+        }
+        return msg;
+      });
+
+      // For conversations, use chat
+      const chat = this.model.startChat({
+        history: enhancedMessages.slice(0, -1).map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }))
+      });
       
-      const result = await chat.sendMessage(lastMessage.content);
-      return result.response.text();
+      // Send the last message and get the streaming response
+      const lastMessage = enhancedMessages[enhancedMessages.length - 1];
+      const streamingResponse = await chat.sendMessageStream(lastMessage.content);
+      
+      let fullResponse = '';
+      for await (const chunk of streamingResponse.stream) {
+        if (chunk.text) {
+          const text = chunk.text();
+          fullResponse += text;
+          yield text;
+        }
+      }
+
+      // Check if response was cut off and continue if needed
+      if (fullResponse.endsWith('...') || fullResponse.endsWith('…') || !fullResponse.trim().endsWith('.')) {
+        console.log('Response appears to be cut off, attempting to continue...');
+        const continuationResponse = await chat.sendMessageStream('Please continue your previous response.');
+        for await (const chunk of continuationResponse.stream) {
+          if (chunk.text) {
+            const text = chunk.text();
+            yield text;
+          }
+        }
+      }
     } catch (error) {
       console.error('Gemini API Error:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to generate response');
@@ -133,6 +277,10 @@ export class GeminiService implements ModelService {
     // Reset model instance when config changes
     this.genAI = null;
     this.model = null;
+  }
+
+  getCurrentModel(): string {
+    return 'gemini-2.0-flash';
   }
 }
 

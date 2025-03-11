@@ -1,13 +1,15 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import { ThemeProvider } from './context/ThemeContext';
-import './index.css';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { ThemeProvider } from '@components/theme/ThemeProvider';
+import '@styles/globals.css';
+import '@styles/animations.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+// Create root and render app
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <ThemeProvider>
       <App />
     </ThemeProvider>
-  </StrictMode>
+  </React.StrictMode>
 );

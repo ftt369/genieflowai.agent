@@ -6,6 +6,7 @@ import { ResearchResult } from '../types';
 export default function ResearchAgent() {
   const { 
     researchAgents, 
+    
     activeResearchAgentId,
     createResearchAgent,
     setActiveResearchAgent,

@@ -1,521 +1,226 @@
-import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Bot, Search, Link2, Settings, Plus, Trash2, Power, Loader2, ArrowUpDown, BarChart2, Network, List } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from 'react-beautiful-dnd';
-import { AgentConfigModal } from './AgentConfigModal';
-import { Agent, AgentLink } from '../types/agent';
-import { AgentNetwork } from './AgentNetwork';
-import { AgentMetrics } from './AgentMetrics';
+import React, { useState } from 'react';
+import { useOverlayStore } from '../stores/theme/overlayStore';
+import { X, MessageSquare, Bot, Plus, Settings, Layers } from 'lucide-react';
+import { cn } from '../lib/utils';
+import ThemeCustomizer from './ThemeCustomizer';
+import MaterialToggle from './MaterialToggle';
+import { ReportAgent } from './agent/ReportAgent';
 
-export function RightSidebar() {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [activeTab, setActiveTab] = useState<'list' | 'network' | 'metrics' | 'settings'>('list');
-  const [width, setWidth] = useState(320);
-  const [isDragging, setIsDragging] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isConfiguring, setIsConfiguring] = useState<number | null>(null);
-  const [isLinking, setIsLinking] = useState<number | null>(null);
-  const [links, setLinks] = useState<AgentLink[]>([
-    { sourceId: 1, targetId: 2, type: 'data', status: 'active' }
-  ]);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const [agents, setAgents] = useState<Agent[]>([
-    { 
-      id: 1, 
-      name: 'Research Agent', 
-      task: 'Analyze research papers', 
-      isActive: true,
-      status: 'running',
-      type: 'research',
-      linkedTo: [2],
-      config: {
-        memory: 512,
-        speed: 75,
-        accuracy: 90,
-        interval: 5
-      }
-    },
-    { 
-      id: 2, 
-      name: 'Code Agent', 
-      task: 'Write and review code', 
-      isActive: false,
-      status: 'idle',
-      type: 'code',
-      config: {
-        memory: 1024,
-        speed: 60,
-        accuracy: 85,
-        interval: 3
-      }
-    },
-    { 
-      id: 3, 
-      name: 'Data Agent', 
-      task: 'Process and analyze data', 
-      isActive: false,
-      status: 'error',
-      type: 'data',
-      config: {
-        memory: 2048,
-        speed: 90,
-        accuracy: 95,
-        interval: 1
-      }
-    },
-  ]);
+interface RightSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  mainChatMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string }>;
+  onMainChatInteraction?: (action: 'copy' | 'workflow', content: string) => void;
+}
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.style.cursor = 'ew-resize';
-    document.body.classList.add('resize-active');
-  };
+export default function RightSidebar({ 
+  isOpen, 
+  onClose,
+  mainChatMessages,
+  onMainChatInteraction 
+}: RightSidebarProps) {
+  const { material } = useOverlayStore();
+  const [activeTab, setActiveTab] = useState<'customize' | 'chats' | 'agents'>('customize');
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging && sidebarRef.current) {
-      const newWidth = window.innerWidth - e.clientX;
-      const clampedWidth = Math.max(280, Math.min(800, newWidth));
-      setWidth(clampedWidth);
-      window.dispatchEvent(new CustomEvent('sidebar-resize', { 
-        detail: { width: clampedWidth, expanded: isExpanded } 
-      }));
-    }
-  };
+  const tabs = [
+    { id: 'customize', label: 'Customize', icon: Settings },
+    { id: 'chats', label: 'Chats', icon: MessageSquare },
+    { id: 'agents', label: 'Agents', icon: Bot }
+  ] as const;
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    document.body.style.cursor = '';
-    document.body.classList.remove('resize-active');
-  };
+  const presetAgents = [
+    { id: 'research', name: 'Research Assistant', type: 'research', description: 'Analyze research papers and documents' },
+    { id: 'code', name: 'Code Assistant', type: 'code', description: 'Write and review code' },
+    { id: 'data', name: 'Data Analyst', type: 'data', description: 'Process and analyze data' },
+    { id: 'creative', name: 'Creative Assistant', type: 'creative', description: 'Generate creative content' },
+    { id: 'report', name: 'Report Generator', type: 'report', description: 'Generate and export professional reports' }
+  ];
 
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
-
-  const addNewAgent = () => {
-    const newAgent: Agent = {
-      id: agents.length + 1,
-      name: `New Agent ${agents.length + 1}`,
-      task: 'Configure this agent',
-      isActive: false,
-      status: 'idle',
-      type: 'research',
-      config: {
-        memory: 512,
-        speed: 50,
-        accuracy: 75,
-        interval: 5
-      }
-    };
-    setAgents([...agents, newAgent]);
-    setIsConfiguring(newAgent.id);
-  };
-
-  const toggleAgent = (id: number) => {
-    setAgents(agents.map(agent => 
-      agent.id === id ? { ...agent, isActive: !agent.isActive } : agent
-    ));
-  };
-
-  const deleteAgent = (id: number) => {
-    setAgents(agents.filter(agent => agent.id !== id));
-  };
-
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const items = Array.from(agents);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    setAgents(items);
-  };
-
-  const handleAgentUpdate = (updatedAgent: Agent) => {
-    setAgents(agents.map(agent => 
-      agent.id === updatedAgent.id ? updatedAgent : agent
-    ));
-  };
-
-  const handleLinkClick = (id: number) => {
-    if (isLinking === null) {
-      setIsLinking(id);
-    } else if (isLinking !== id) {
-      // Create a new link
-      const newLink: AgentLink = {
-        sourceId: isLinking,
-        targetId: id,
-        type: 'data',
-        status: 'active'
-      };
-      
-      // Update agent's linkedTo array
-      setAgents(agents.map(agent => {
-        if (agent.id === isLinking) {
-          return {
-            ...agent,
-            linkedTo: [...(agent.linkedTo || []), id]
-          };
-        }
-        return agent;
-      }));
-
-      // Add the link to links array
-      setLinks([...links, newLink]);
-      setIsLinking(null);
-    }
-  };
-
-  const getStatusColor = (status: Agent['status']) => {
-    switch (status) {
-      case 'running':
-        return 'text-green-500';
-      case 'error':
-        return 'text-red-500';
+  const renderAgentContent = () => {
+    switch (selectedAgent) {
+      case 'report':
+        return <ReportAgent />;
       default:
-        return 'text-muted-foreground';
+        return (
+          <div className="text-sm text-[var(--muted-foreground)] text-center py-4">
+            Select an agent to get started
+          </div>
+        );
     }
-  };
-
-  const filteredAgents = agents.filter(agent =>
-    agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    agent.task.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-    // Emit resize event when toggling
-    window.dispatchEvent(new CustomEvent('sidebar-resize', { 
-      detail: { width: width, expanded: !isExpanded } 
-    }));
   };
 
   return (
-    <>
-      <div 
-        ref={sidebarRef}
-        style={{ 
-          width: isExpanded ? `${width}px` : '48px',
-          transition: isDragging ? 'none' : 'width 300ms ease'
-        }}
-        className={`fixed right-0 top-0 h-screen bg-card/50 backdrop-blur-sm border-l border-input 
-                  ${isDragging ? 'select-none' : ''} z-40`}
-      >
-        {/* Resize Handle */}
-        {isExpanded && (
-          <div
-            className={`absolute left-0 top-0 w-1 h-full cursor-ew-resize group
-                      hover:w-1.5 transition-all duration-150 ${isDragging ? 'w-1.5' : ''}`}
-            onMouseDown={handleMouseDown}
-          >
-            <div className={`absolute inset-0 bg-primary/20 
-                          group-hover:bg-primary/40 ${isDragging ? 'bg-primary/40' : ''}`} />
+    <aside className={cn(
+      "fixed inset-y-0 right-0 w-80 z-50",
+      "transform transition-transform duration-300 ease-in-out",
+      "bg-[var(--background)] border-l border-[var(--border)]",
+      "material-base",
+      material.type !== 'none' && `material-${material.type}`,
+      material.animation?.enabled && 'material-animated',
+      material.responsive && 'material-interactive',
+      isOpen ? 'translate-x-0' : 'translate-x-full'
+    )}>
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div className="flex gap-2">
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  "p-2 rounded-lg transition-colors flex items-center gap-2",
+                  activeTab === id 
+                    ? "bg-[var(--primary)] text-white" 
+                    : "hover:bg-[var(--muted)]"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-sm font-medium">{label}</span>
+              </button>
+            ))}
           </div>
-        )}
-        
-        {/* Toggle Button */}
-        <button
-          onClick={toggleExpanded}
-          className="absolute left-0 top-1/2 transform -translate-x-full -translate-y-1/2 
-                   bg-card/50 backdrop-blur-sm border border-input rounded-l-md p-2 
-                   hover:bg-accent transition-colors"
-          aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          {isExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        {isExpanded && (
-          <div className="h-full flex flex-col p-4">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-card-foreground">Research & Agents</h2>
-              <button
-                onClick={addNewAgent}
-                className="p-2 hover:bg-accent rounded-md transition-colors"
-                aria-label="Add new agent"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'customize' && (
+            <div className="p-4 space-y-6">
+              {/* Theme Customization */}
+              <section className="space-y-4">
+                <h3 className="text-base font-medium">Theme</h3>
+                <ThemeCustomizer />
+              </section>
+
+              {/* Material Effects */}
+              <section className="space-y-4">
+                <h3 className="text-base font-medium">Material Effects</h3>
+                <MaterialToggle />
+              </section>
             </div>
+          )}
 
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 mb-4 bg-background/50 p-1 rounded-md">
-              <button
-                onClick={() => setActiveTab('list')}
-                className={`flex items-center justify-center flex-1 py-1.5 px-2 text-sm rounded-md transition-colors space-x-2
-                          ${activeTab === 'list' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'hover:bg-accent text-muted-foreground'}`}
-              >
-                <List className="h-4 w-4" />
-                <span>List</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('network')}
-                className={`flex items-center justify-center flex-1 py-1.5 px-2 text-sm rounded-md transition-colors space-x-2
-                          ${activeTab === 'network' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'hover:bg-accent text-muted-foreground'}`}
-              >
-                <Network className="h-4 w-4" />
-                <span>Network</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('metrics')}
-                className={`flex items-center justify-center flex-1 py-1.5 px-2 text-sm rounded-md transition-colors space-x-2
-                          ${activeTab === 'metrics' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'hover:bg-accent text-muted-foreground'}`}
-              >
-                <BarChart2 className="h-4 w-4" />
-                <span>Metrics</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`flex items-center justify-center flex-1 py-1.5 px-2 text-sm rounded-md transition-colors space-x-2
-                          ${activeTab === 'settings' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'hover:bg-accent text-muted-foreground'}`}
-              >
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </button>
-            </div>
-
-            {/* Search Bar - only show for list view */}
-            {activeTab === 'list' && (
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search agents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-background/50 border border-input rounded-md 
-                           text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 
-                           focus:ring-primary transition-colors"
-                />
+          {activeTab === 'chats' && (
+            <div className="p-4 space-y-6">
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <button className="flex-1 flex items-center justify-center gap-2 p-2 bg-[var(--primary)] text-white rounded-lg hover:opacity-90">
+                  <Plus className="h-4 w-4" />
+                  New Chat
+                </button>
               </div>
-            )}
 
-            {/* Content based on active tab */}
-            <div className="flex-1 overflow-hidden">
-              {activeTab === 'list' && (
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  <Droppable droppableId="agents">
-                    {(provided: DroppableProvided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        className="flex-1 overflow-auto space-y-3"
-                      >
-                        {filteredAgents.map((agent, index) => (
-                          <Draggable 
-                            key={agent.id} 
-                            draggableId={agent.id.toString()} 
-                            index={index}
+              {/* Recent Chats */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-medium text-[var(--muted-foreground)]">Recent</h3>
+                <div className="space-y-2">
+                  {mainChatMessages && mainChatMessages.map((msg) => (
+                    <div 
+                      key={msg.id}
+                      className={cn(
+                        "p-3 rounded-lg",
+                        "material-base material-glass material-interactive",
+                        msg.role === 'assistant' ? 'bg-[var(--primary)]/10' : 'bg-[var(--muted)]'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium capitalize">{msg.role}</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => onMainChatInteraction?.('copy', msg.content)}
+                            className="text-xs hover:text-[var(--primary)]"
                           >
-                            {(provided: DraggableProvided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={`group relative p-4 rounded-lg border transition-all duration-200
-                                          ${agent.isActive 
-                                            ? 'bg-primary/10 border-primary shadow-md' 
-                                            : 'bg-background/50 border-input hover:border-primary hover:shadow-sm'}
-                                          ${isLinking === agent.id ? 'ring-2 ring-primary' : ''}
-                                          ${isLinking !== null && isLinking !== agent.id 
-                                            ? 'cursor-pointer hover:ring-2 hover:ring-primary' 
-                                            : ''}`}
-                                onClick={() => isLinking !== null && handleLinkClick(agent.id)}
-                              >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center space-x-3">
-                                    <div className={`p-2 rounded-md bg-background/80 ${getStatusColor(agent.status)}`}>
-                                      {agent.status === 'running' ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Bot className="h-4 w-4" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <h3 className="font-medium text-card-foreground">{agent.name}</h3>
-                                      <p className="text-sm text-muted-foreground">{agent.task}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleAgent(agent.id);
-                                      }}
-                                      className={`p-1.5 rounded-md transition-colors
-                                                ${agent.isActive 
-                                                  ? 'bg-primary/20 text-primary hover:bg-primary/30' 
-                                                  : 'hover:bg-accent text-muted-foreground'}`}
-                                    >
-                                      <Power className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Agent Actions */}
-                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-input">
-                                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                                    {agent.linkedTo && agent.linkedTo.length > 0 && (
-                                      <div className="flex items-center space-x-1">
-                                        <Link2 className="h-3 w-3" />
-                                        <span>{agent.linkedTo.length} linked</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleLinkClick(agent.id);
-                                      }}
-                                      className={`p-1.5 rounded-md transition-colors
-                                                ${isLinking === agent.id 
-                                                  ? 'bg-primary/20 text-primary' 
-                                                  : 'hover:bg-accent text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                      <Link2 className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsConfiguring(agent.id);
-                                      }}
-                                      className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                                    >
-                                      <Settings className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteAgent(agent.id);
-                                      }}
-                                      className="p-1.5 rounded-md hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Link Indicator */}
-                                {links.some(link => link.sourceId === agent.id || link.targetId === agent.id) && (
-                                  <div className="absolute -right-2 -top-2 w-4 h-4 bg-primary rounded-full border-2 border-background" />
-                                )}
-
-                                {/* Drag Handle */}
-                                <div
-                                  {...provided.dragHandleProps}
-                                  className="absolute -left-3 top-1/2 transform -translate-y-1/2 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-              )}
-
-              {activeTab === 'network' && (
-                <div className="h-full">
-                  <AgentNetwork agents={agents} links={links} />
-                </div>
-              )}
-
-              {activeTab === 'metrics' && (
-                <div className="space-y-6 p-4 overflow-auto">
-                  {agents.map(agent => (
-                    <div key={agent.id} className="rounded-lg border border-input bg-background/50 p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-md bg-background/80 ${getStatusColor(agent.status)}`}>
-                            {agent.status === 'running' ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Bot className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-medium">{agent.name}</h3>
-                            <p className="text-sm text-muted-foreground">{agent.task}</p>
-                          </div>
+                            Copy
+                          </button>
+                          <button
+                            onClick={() => onMainChatInteraction?.('workflow', msg.content)}
+                            className="text-xs hover:text-[var(--primary)]"
+                          >
+                            Add to Workflow
+                          </button>
                         </div>
-                        <button
-                          onClick={() => toggleAgent(agent.id)}
-                          className={`p-2 rounded-md transition-colors
-                                    ${agent.isActive 
-                                      ? 'bg-primary/20 text-primary hover:bg-primary/30' 
-                                      : 'hover:bg-accent text-muted-foreground'}`}
-                        >
-                          <Power className="h-4 w-4" />
-                        </button>
                       </div>
-                      <AgentMetrics agent={agent} />
+                      <p className="text-sm">{msg.content}</p>
                     </div>
                   ))}
                 </div>
-              )}
+              </section>
 
-              {activeTab === 'settings' && (
-                <div className="space-y-4 p-2">
-                  <div className="rounded-lg border border-input bg-background/50 p-4">
-                    <h3 className="font-medium mb-2">Global Settings</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm text-muted-foreground">Default Memory Allocation</label>
-                        <input
-                          type="range"
-                          min="128"
-                          max="2048"
-                          step="128"
-                          defaultValue="512"
-                          className="w-full mt-2"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-muted-foreground">Update Interval</label>
-                        <input
-                          type="range"
-                          min="1"
-                          max="60"
-                          defaultValue="5"
-                          className="w-full mt-2"
-                        />
-                      </div>
-                    </div>
-                  </div>
+              {/* Saved Chats */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-medium text-[var(--muted-foreground)]">Saved</h3>
+                <div className="text-sm text-[var(--muted-foreground)] text-center py-4">
+                  No saved chats yet
                 </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'agents' && (
+            <div className="p-4 space-y-6">
+              {/* Quick Actions */}
+              <div className="flex gap-2">
+                <button className="flex-1 flex items-center justify-center gap-2 p-2 bg-[var(--primary)] text-white rounded-lg hover:opacity-90">
+                  <Plus className="h-4 w-4" />
+                  New Agent
+                </button>
+              </div>
+
+              {/* Preset Agents */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-medium text-[var(--muted-foreground)]">Preset Agents</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {presetAgents.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => setSelectedAgent(agent.id)}
+                      className={cn(
+                        "p-3 rounded-lg text-left w-full",
+                        "material-base material-glass material-interactive",
+                        selectedAgent === agent.id ? "bg-[var(--primary)]/10" : "hover:bg-[var(--muted)]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-md bg-[var(--primary)]/10">
+                          <Bot className="h-4 w-4 text-[var(--primary)]" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{agent.name}</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">{agent.description}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Custom Agents */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-medium text-[var(--muted-foreground)]">Custom Agents</h3>
+                <div className="text-sm text-[var(--muted-foreground)] text-center py-4">
+                  No custom agents yet
+                </div>
+              </section>
+
+              {/* Selected Agent Content */}
+              {selectedAgent && (
+                <section className="mt-6">
+                  <div className="border-t border-[var(--border)] pt-6">
+                    {renderAgentContent()}
+                  </div>
+                </section>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-
-      {/* Configuration Modal */}
-      {isConfiguring !== null && (
-        <AgentConfigModal
-          agent={agents.find(a => a.id === isConfiguring) || null}
-          onClose={() => setIsConfiguring(null)}
-          onSave={handleAgentUpdate}
-        />
-      )}
-    </>
+    </aside>
   );
 } 

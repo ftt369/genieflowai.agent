@@ -120,10 +120,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
       id: uuidv4(),
     };
 
-    // TODO: Generate embeddings for the document
-    // const embedding = await generateEmbedding(document.content);
-    // newDocument.embedding = embedding;
-
     set((state) => ({
       knowledgeBases: state.knowledgeBases.map((kb) =>
         kb.id === knowledgeBaseId
@@ -136,7 +132,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
                 stats: {
                   ...kb.metadata.stats,
                   documentCount: kb.documents.length + 1,
-                  totalSize: kb.metadata.stats.totalSize + newDocument.metadata.size,
+                  totalSize: kb.metadata.stats.totalSize + (document.metadata?.size || 0),
                   lastUpdated: new Date(),
                 },
               },
@@ -202,11 +198,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // TODO: Implement vector search using embeddings
-      // const queryEmbedding = await generateEmbedding(query);
-      // const results = await searchVectorDatabase(queryEmbedding, filters);
-      
-      // Temporary simple search implementation
       const activeKb = get().getActiveKnowledgeBase();
       if (!activeKb) throw new Error('No active knowledge base');
 
@@ -232,24 +223,23 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // TODO: Implement actual API call to fetch marketplace items
+      // TODO: Replace with actual API call
       const mockItems: MarketplaceItem[] = [
         {
           id: uuidv4(),
           type: 'knowledgeBase',
-          name: 'Legal Research Base',
-          description: 'Comprehensive legal knowledge base with case law and statutes',
+          name: 'Research Papers Collection',
+          description: 'A curated collection of academic research papers',
           author: {
             id: '1',
-            name: 'Legal AI Solutions',
+            name: 'Academic AI',
             reputation: 4.8,
           },
           pricing: {
-            type: 'subscription',
-            price: 49.99,
+            type: 'free',
+            price: 0,
             currency: 'USD',
-            interval: 'monthly',
-            commission: 10,
+            commission: 0,
           },
           stats: {
             downloads: 1200,
@@ -259,9 +249,9 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
           metadata: {
             createdAt: new Date(),
             updatedAt: new Date(),
-            version: '2.1.0',
-            tags: ['legal', 'law', 'research'],
-            category: 'Legal',
+            version: '1.0.0',
+            tags: ['research', 'academic', 'papers'],
+            category: 'Academic',
             requirements: ['GPT-4'],
             compatibility: ['v2.0.0'],
           },
@@ -280,11 +270,11 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // TODO: Implement actual purchase flow with payment processing
-      console.log(`Processing purchase for item: ${itemId}`);
-      // 1. Process payment
-      // 2. Grant access to the item
-      // 3. Update user's purchases
+      const item = get().marketplaceItems.find((i) => i.id === itemId);
+      if (!item) throw new Error('Item not found');
+
+      // TODO: Implement actual purchase flow
+      console.log(`Purchased item: ${item.name}`);
     } catch (error) {
       set({ error: (error as Error).message });
     } finally {
@@ -300,12 +290,6 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
       if (!item || item.type !== 'knowledgeBase') {
         throw new Error('Invalid marketplace item');
       }
-
-      // TODO: Implement actual import logic
-      // 1. Download knowledge base content
-      // 2. Process and validate documents
-      // 3. Generate embeddings
-      // 4. Save to local storage
 
       const newKb = get().createKnowledgeBase(
         item.name,

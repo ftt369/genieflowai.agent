@@ -1,21 +1,17 @@
+@import './animations.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import './animations.css';
-
 @layer base {
   :root {
-    --accent-color: #3b82f6;
-    
-    /* Light theme - brighter colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: var(--accent-color);
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -23,42 +19,34 @@
     --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: var(--accent-color);
-
-    /* Animation durations */
-    --theme-transition-duration: 0.3s;
-    --theme-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
-
-    /* Fix background color application */
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
   }
 
   .dark {
-    /* Dark theme - darker colors */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: var(--accent-color);
-    --primary-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: var(--accent-color);
-
-    /* Fix background color application */
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    --ring: 224.3 76.3% 48%;
   }
 }
 
@@ -70,8 +58,9 @@
   html,
   body {
     @apply min-h-screen;
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--background);
+    color: var(--foreground);
+    transition: background-color 0.3s, color 0.3s;
   }
 
   body {
@@ -285,15 +274,17 @@ textarea {
 .theme-transition-overlay {
   position: fixed;
   inset: 0;
-  pointer-events: none;
-  z-index: 9999;
+  background: radial-gradient(circle at center, 
+    var(--primary) 0%,
+    transparent 100%);
   opacity: 0;
-  background: radial-gradient(circle at center, var(--accent-color) 0%, transparent 100%);
-  transition: opacity var(--theme-transition-duration) var(--theme-transition-timing);
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  z-index: 9999;
 }
 
 .theme-changing .theme-transition-overlay {
-  opacity: 0.1;
+  opacity: 0.15;
 }
 
 /* Shimmer effect for loading states */
@@ -312,4 +303,760 @@ textarea {
   );
   transform: translateX(-100%);
   animation: shimmer 1.5s infinite;
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+/* Add utility classes */
+.bg-primary { background-color: var(--primary); }
+.text-primary { color: var(--primary); }
+.border-primary { border-color: var(--primary); }
+/* Add more utility classes as needed */
+
+/* Add to your existing CSS */
+.theme-transition {
+  transition: 
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Glass effect utilities */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+}
+
+.glow {
+  box-shadow: var(--glow);
+}
+
+/* Theme-specific styles */
+[data-theme="obsidianGlass"] .glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+[data-theme="steampunk"] .glass {
+  background: rgba(193, 127, 89, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme="tokyoNights"] .glass {
+  background: rgba(122, 162, 247, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="cyborg"] .glass {
+  background: rgba(0, 255, 156, 0.05);
+  backdrop-filter: blur(15px);
+}
+
+/* Touch-friendly styles */
+@media (hover: none) {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+/* Smooth transitions */
+.material-effect {
+  transition: all 0.3s ease;
+}
+
+/* Custom range input styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: var(--muted);
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
+/* Prevent text selection during touch interactions */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Better touch targets */
+button, 
+input, 
+select {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Larger touch targets on mobile */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Full-width modals on mobile */
+  .modal-mobile {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    height: 100vh;
+  }
+
+  /* Bottom sheet style for modals */
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+  }
+
+  .bottom-sheet.open {
+    transform: translateY(0);
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-area-padding {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Add smooth momentum scrolling on iOS */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent pull-to-refresh on mobile */
+html, body {
+  overscroll-behavior-y: contain;
+}
+
+/* Hide scrollbars but keep functionality */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Active state for touch devices */
+@media (hover: none) {
+  .touch-active:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Material effects refinements */
+.material-effect {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* Improved touch feedback */
+.touch-feedback {
+  position: relative;
+  overflow: hidden;
+}
+
+.touch-feedback::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 70%);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+  pointer-events: none;
+}
+
+.touch-feedback:active::after {
+  transform: translate(-50%, -50%) scale(4);
+  opacity: 0.3;
+}
+
+body {
+  @apply bg-background text-foreground;
+}
+
+/* Theme transitions */
+* {
+  transition: background-color 0.3s ease, 
+              color 0.3s ease, 
+              border-color 0.3s ease, 
+              box-shadow 0.3s ease;
+}
+
+/* Theme transition overlay */
+.theme-transition-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, 
+    var(--primary) 0%,
+    transparent 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  z-index: 9999;
+}
+
+.theme-changing .theme-transition-overlay {
+  opacity: 0.15;
+}
+
+/* Base theme variables */
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --primary: #2563eb;
+  --secondary: #4b5563;
+  --muted: #f3f4f6;
+  --accent: #3b82f6;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --border: #e5e7eb;
+  
+  --effect-glow: 0 0 20px rgba(37, 99, 235, 0.15);
+  --effect-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --effect-border: 1px solid rgba(0, 0, 0, 0.1);
+  --effect-opacity: 1;
+}
+
+.dark {
+  --background: #1a1a1a;
+  --foreground: #ffffff;
+  --primary: #3b82f6;
+  --secondary: #9ca3af;
+  --muted: #2a2a2a;
+  --accent: #60a5fa;
+  --card: #2a2a2a;
+  --card-foreground: #ffffff;
+  --border: #333333;
+  
+  --effect-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+  --effect-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --effect-border: 1px solid rgba(255, 255, 255, 0.1);
+  --effect-opacity: 1;
+}
+
+/* Apply theme variables */
+.bg-background { background-color: var(--background); }
+.text-foreground { color: var(--foreground); }
+.bg-primary { background-color: var(--primary); }
+.text-primary { color: var(--primary); }
+.bg-secondary { background-color: var(--secondary); }
+.text-secondary { color: var(--secondary); }
+.bg-muted { background-color: var(--muted); }
+.text-muted { color: var(--muted); }
+.bg-accent { background-color: var(--accent); }
+.text-accent { color: var(--accent); }
+
+/* Add these to your existing globals.css */
+
+.gradient-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  transition: opacity 0.3s ease;
+}
+
+.gradient-top-bottom {
+  background: linear-gradient(
+    to bottom,
+    var(--gradient-start-color),
+    var(--gradient-end-color)
+  );
+}
+
+.gradient-bottom-top {
+  background: linear-gradient(
+    to top,
+    var(--gradient-start-color),
+    var(--gradient-end-color)
+  );
+}
+
+.gradient-center-radial {
+  background: radial-gradient(
+    circle at center,
+    var(--gradient-start-color),
+    var(--gradient-end-color)
+  );
+}
+
+/* Advanced Material System */
+:root {
+  /* Base Properties */
+  --material-opacity: 0.5;
+  --material-blur: 8px;
+  --material-metallic: 0.8;
+  --material-roughness: 0.2;
+  
+  /* 3D Transform Properties */
+  --material-depth: 20px;
+  --material-rotation-x: 0deg;
+  --material-rotation-y: 0deg;
+  --material-perspective: 1000px;
+  
+  /* Particle Properties */
+  --particle-count: 20;
+  --particle-speed: 3s;
+  --particle-color: rgba(255, 255, 255, 0.8);
+  
+  /* Color Effects */
+  --color-shift-hue: 0deg;
+  --color-shift-saturation: 100%;
+  --color-shift-lightness: 50%;
+  --glitch-offset: 2px;
+  
+  /* Interactive Properties */
+  --magnetic-strength: 1;
+  --tilt-amount: 10deg;
+  --hover-lift: 10px;
+}
+
+/* Material Effects Base */
+.material-base {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Glass Effect */
+.material-glass {
+  background: rgba(255, 255, 255, var(--material-opacity, 0.5));
+  backdrop-filter: blur(var(--material-blur, 8px));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Water Drops Effect */
+.material-water {
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.material-water::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 0 0 / 50% 50%,
+    radial-gradient(circle at 70% 60%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 50% 0 / 50% 50%,
+    radial-gradient(circle at 40% 80%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 0 50% / 50% 50%,
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 50% 50% / 50% 50%;
+  animation: waterDrops 8s linear infinite;
+}
+
+.material-water::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  animation: waterFlow 3s ease-in-out infinite;
+}
+
+/* Metal Effect */
+.material-metal {
+  background: 
+    linear-gradient(
+      135deg,
+      rgba(180, 180, 180, 0.8),
+      rgba(220, 220, 220, 0.9)
+    );
+  position: relative;
+  overflow: hidden;
+}
+
+.material-metal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(
+      45deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.2) 45%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0.2) 55%,
+      transparent 100%
+    );
+  background-size: 200% 200%;
+  animation: metalShine 5s ease-in-out infinite;
+}
+
+.material-metal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.05) 0px,
+      rgba(0, 0, 0, 0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+/* Crystal Effect */
+.material-crystal {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.material-crystal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 45%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0.4) 55%,
+      transparent 100%
+    );
+  background-size: 300% 300%;
+  animation: crystalShine 8s ease-in-out infinite;
+}
+
+.material-crystal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(45deg, transparent 48%, rgba(255, 255, 255, 0.2) 50%, transparent 52%) 0 0 / 10px 10px,
+    linear-gradient(-45deg, transparent 48%, rgba(255, 255, 255, 0.2) 50%, transparent 52%) 0 0 / 10px 10px;
+}
+
+/* Animations */
+@keyframes waterDrops {
+  0% {
+    background-position: 0% 0%, 50% 0%, 0% 50%, 50% 50%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 0% 100%, 50% 100%, 0% 150%, 50% 150%;
+    opacity: 0;
+  }
+}
+
+@keyframes waterFlow {
+  0%, 100% {
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes metalShine {
+  0% {
+    background-position: 200% 200%;
+  }
+  50% {
+    background-position: -100% -100%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+@keyframes crystalShine {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+/* Add these interaction effects */
+.material-interactive.material-metal:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 10px 20px rgba(0, 0, 0, 0.1),
+    0 6px 6px rgba(0, 0, 0, 0.1);
+}
+
+.material-interactive.material-crystal:hover {
+  transform: translateY(-2px) rotate3d(1, 1, 0, 5deg);
+  box-shadow: 
+    0 15px 25px rgba(255, 255, 255, 0.1),
+    0 5px 10px rgba(255, 255, 255, 0.05);
+}
+
+.material-interactive.material-water:hover::before {
+  animation-duration: 4s;
+}
+
+/* Water Drops Effect */
+.material-water {
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.material-water::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 0 0 / 50% 50%,
+    radial-gradient(circle at 70% 60%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 50% 0 / 50% 50%,
+    radial-gradient(circle at 40% 80%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 0 50% / 50% 50%,
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 25%) 50% 50% / 50% 50%;
+  animation: waterDrops 8s linear infinite;
+}
+
+.material-water::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  animation: waterFlow 3s ease-in-out infinite;
+}
+
+/* Metal Effect */
+.material-metal {
+  background: 
+    linear-gradient(
+      135deg,
+      rgba(180, 180, 180, 0.8),
+      rgba(220, 220, 220, 0.9)
+    );
+  position: relative;
+  overflow: hidden;
+}
+
+.material-metal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(
+      45deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.2) 45%,
+      rgba(255, 255, 255, 0.4) 50%,
+      rgba(255, 255, 255, 0.2) 55%,
+      transparent 100%
+    );
+  background-size: 200% 200%;
+  animation: metalShine 5s ease-in-out infinite;
+}
+
+.material-metal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    repeating-linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.05) 0px,
+      rgba(0, 0, 0, 0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+}
+
+/* Crystal Effect */
+.material-crystal {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.material-crystal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 45%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0.4) 55%,
+      transparent 100%
+    );
+  background-size: 300% 300%;
+  animation: crystalShine 8s ease-in-out infinite;
+}
+
+.material-crystal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(45deg, transparent 48%, rgba(255, 255, 255, 0.2) 50%, transparent 52%) 0 0 / 10px 10px,
+    linear-gradient(-45deg, transparent 48%, rgba(255, 255, 255, 0.2) 50%, transparent 52%) 0 0 / 10px 10px;
+}
+
+/* Animations */
+@keyframes waterDrops {
+  0% {
+    background-position: 0% 0%, 50% 0%, 0% 50%, 50% 50%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 0% 100%, 50% 100%, 0% 150%, 50% 150%;
+    opacity: 0;
+  }
+}
+
+@keyframes waterFlow {
+  0%, 100% {
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes metalShine {
+  0% {
+    background-position: 200% 200%;
+  }
+  50% {
+    background-position: -100% -100%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+@keyframes crystalShine {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+/* Add these interaction effects */
+.material-interactive.material-metal:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 10px 20px rgba(0, 0, 0, 0.1),
+    0 6px 6px rgba(0, 0, 0, 0.1);
+}
+
+.material-interactive.material-crystal:hover {
+  transform: translateY(-2px) rotate3d(1, 1, 0, 5deg);
+  box-shadow: 
+    0 15px 25px rgba(255, 255, 255, 0.1),
+    0 5px 10px rgba(255, 255, 255, 0.05);
+}
+
+.material-interactive.material-water:hover::before {
+  animation-duration: 4s;
 } 
