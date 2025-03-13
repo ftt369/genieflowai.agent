@@ -1262,7 +1262,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="px-4 py-3">
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* File Input with Drag & Drop */}
               <FileDropZone
                 onFilesAdded={(newAttachments) => {
@@ -1282,8 +1282,6 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                     message: errorMessage
                   }]);
                 }}
-                buttonClassName="p-2.5 rounded-lg hover:bg-muted transition-colors"
-                disabled={isLoading}
               />
 
               {/* Voice Input */}
@@ -1291,7 +1289,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                 type="button"
                 onClick={toggleVoiceRecording}
                 className={cn(
-                  "p-2.5 rounded-lg transition-colors flex items-center justify-center",
+                  "p-2 rounded-lg transition-colors",
                   voiceState.isRecording ? "text-red-500 bg-red-100" : "hover:bg-muted"
                 )}
                 title={voiceState.isRecording ? "Stop recording" : "Start voice input"}
@@ -1308,7 +1306,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                 <button
                   type="button"
                   onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="p-2.5 rounded-lg hover:bg-muted transition-colors flex items-center justify-center"
+                  className="p-2 rounded-lg hover:bg-muted transition-colors"
                   title="Export chat"
                 >
                   <Download className="w-5 h-5" />
@@ -1334,28 +1332,21 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
               </div>
 
               {/* Main Input */}
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={voiceState.isRecording ? 'Listening...' : `Message ${currentMode?.name || 'Assistant'}...`}
-                  className="w-full px-4 py-3 rounded-lg border bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled={isLoading || voiceState.isRecording}
-                />
-                {isDragging && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
-                    <span className="text-primary font-medium">Drop files here</span>
-                  </div>
-                )}
-              </div>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={voiceState.isRecording ? 'Listening...' : `Message ${currentMode?.name || 'Assistant'}...`}
+                className="flex-1 px-4 py-2 rounded-lg border bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={isLoading || voiceState.isRecording}
+              />
 
               {/* Send Button */}
               <button
                 type="submit"
                 disabled={isLoading || (!input.trim() && attachments.length === 0)}
                 className={cn(
-                  "px-4 py-3 rounded-lg transition-colors flex items-center justify-center min-w-[48px]",
+                  "px-4 py-2 rounded-lg transition-colors flex items-center justify-center min-w-[48px]",
                   "bg-primary text-primary-foreground hover:bg-primary/90",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}

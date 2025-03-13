@@ -3,8 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
 // Set the PDF.js worker source
-// Use the local worker file we downloaded to the public directory
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 /**
  * Extracts text content from various file types
@@ -36,16 +35,7 @@ export const extractFileContent = async (file: File): Promise<string> => {
         return text;
       } catch (error: any) {
         console.error(`Error extracting PDF text from ${file.name}:`, error);
-        // Return a more helpful error message
-        return `[PDF Document: ${file.name}] - Unable to extract content. Error: ${error.message || 'Unknown error'}. 
-        
-This may be due to:
-- Network restrictions blocking access to PDF.js worker
-- Security settings in your browser
-- The PDF may be encrypted or password-protected
-- The PDF may not contain extractable text (scanned document)
-
-You can still discuss the document based on its filename and any context you provide.`;
+        return `[PDF Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
       }
     }
     
@@ -97,7 +87,7 @@ You can still discuss the document based on its filename and any context you pro
           return text;
         } catch (error: any) {
           console.error(`Error extracting PDF text from ${file.name} based on extension:`, error);
-          return `[PDF Document: ${file.name}] - Unable to extract content. This may be due to network restrictions or browser security settings.`;
+          return `[PDF Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
         }
       }
       
@@ -151,45 +141,20 @@ export const extractPdfText = async (file: File): Promise<string> => {
     const arrayBuffer = await readAsArrayBuffer(file);
     console.log(`ArrayBuffer created for ${file.name}, size: ${arrayBuffer.byteLength} bytes`);
     
-    // Add more robust error handling for PDF loading
-    console.log(`Loading PDF document ${file.name} with PDF.js version ${pdfjsLib.version}`);
-    
-    // Check if worker is properly set
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      console.warn('PDF.js worker source not set, attempting to set it now');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    }
-    
-    // Load the PDF with more detailed error handling
-    let pdf;
-    try {
-      pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    } catch (error: any) {
-      console.error('PDF.js loading error:', error);
-      if (error.message && error.message.includes('worker')) {
-        throw new Error(`PDF worker failed to load: ${error.message}`);
-      }
-      throw error;
-    }
-    
+    console.log(`Loading PDF document ${file.name}`);
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     console.log(`PDF document loaded: ${file.name}, pages: ${pdf.numPages}`);
     
     let text = '';
     
-    // Extract text with page-by-page error handling
     for (let i = 1; i <= pdf.numPages; i++) {
-      try {
-        console.log(`Processing page ${i} of ${pdf.numPages} in ${file.name}`);
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const strings = content.items.map((item: any) => item.str);
-        const pageText = strings.join(' ');
-        console.log(`Extracted ${pageText.length} characters from page ${i} of ${file.name}`);
-        text += pageText + '\n\n';
-      } catch (pageError: any) {
-        console.error(`Error extracting text from page ${i}:`, pageError);
-        text += `[Error extracting text from page ${i}]\n\n`;
-      }
+      console.log(`Processing page ${i} of ${pdf.numPages} in ${file.name}`);
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const strings = content.items.map((item: any) => item.str);
+      const pageText = strings.join(' ');
+      console.log(`Extracted ${pageText.length} characters from page ${i} of ${file.name}`);
+      text += pageText + '\n\n';
     }
     
     console.log(`Total text extracted from ${file.name}: ${text.length} characters`);
