@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// Add UUID generation function for browser compatibility
+function generateUUID() {
+  // Simple UUID generation that doesn't rely on crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -38,6 +48,7 @@ interface ChatState {
   activeChat: string | null;
   savedChats: string[];
   pinnedChats: string[];
+  showClearConfirm: boolean;
   createChat: () => string;
   addMessage: (chatId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   saveChat: (chatId: string) => void;
@@ -50,6 +61,8 @@ interface ChatState {
   getChat: (chatId: string) => Chat | undefined;
   updateChatTitle: (chatId: string, title: string) => void;
   updateChatSettings: (chatId: string, settings: Partial<ChatSettings>) => void;
+  setShowClearConfirm: (show: boolean) => void;
+  handleClearChat: () => void;
 }
 
 const defaultSettings: ChatSettings = {
@@ -74,10 +87,11 @@ export const useChatStore = create<ChatState>()(
       activeChat: null,
       savedChats: [],
       pinnedChats: [],
+      showClearConfirm: false,
 
       createChat: () => {
         const newChat: Chat = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           title: 'New Chat',
           messages: [],
           createdAt: new Date(),
@@ -98,7 +112,7 @@ export const useChatStore = create<ChatState>()(
           chats: state.chats.map(chat => {
             if (chat.id === chatId) {
               const newMessage: ChatMessage = {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 ...message,
                 timestamp: new Date()
               };
@@ -208,6 +222,17 @@ export const useChatStore = create<ChatState>()(
               : chat
           )
         }));
+      },
+
+      setShowClearConfirm: (show) => {
+        set({ showClearConfirm: show });
+      },
+
+      handleClearChat: () => {
+        const { clearAllChats, createChat, setShowClearConfirm } = get();
+        clearAllChats();
+        createChat();
+        setShowClearConfirm(false);
       }
     }),
     {

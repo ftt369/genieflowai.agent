@@ -1,37 +1,53 @@
 import React, { useState } from 'react';
-import { useThemeStore } from '@stores/theme/themeStore';
-import { useModeStore } from '@stores/model/modeStore';
-import { cn } from '@utils/cn';
+import { useModeStore } from '@/stores/model/modeStore';
+import { useThemeStore } from '@/stores/theme/themeStore';
+import { cn } from '@/lib/utils';
 import { 
   Maximize2,
   Minimize2,
   Settings,
-  Monitor,
-  Moon,
-  Sun,
-  Palette,
   Bot,
   ChevronDown,
   Plus,
-  Pencil
+  Pencil,
+  Sun,
+  Moon,
+  Monitor,
+  Palette,
+  Menu,
+  Search
 } from 'lucide-react';
-import { ThemeSelector } from '@components/theme/ThemeSelector';
-import ThemeAnimationControls from '@components/theme/ThemeAnimationControls';
-import ThemeScheduler from '@components/theme/ThemeScheduler';
-import ThemeSharing from '@components/theme/ThemeSharing';
-import ModeCustomizer from '@components/mode/ModeCustomizer';
+import ModeCustomizer from '@/components/mode/ModeCustomizer';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 interface HeaderBarProps {
   className?: string;
 }
 
-const HeaderBar: React.FC<HeaderBarProps> = ({ className }) => {
-  const { mode, setMode } = useThemeStore();
+// Add UUID generation function for browser compatibility
+function generateUUID() {
+  // Simple UUID generation that doesn't rely on crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+export default function HeaderBar({ className }: HeaderBarProps) {
   const { modes, activeMode, setActiveMode, addCustomMode } = useModeStore();
+  const { mode: themeMode, profile: themeProfile, setMode: setThemeMode, setProfile: setThemeProfile } = useThemeStore();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showModes, setShowModes] = useState(false);
   const [customizingMode, setCustomizingMode] = useState<string | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -47,10 +63,10 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ className }) => {
 
   const handleCreateMode = () => {
     const newMode = {
-      id: `custom-${Date.now()}`,
-      name: 'New Mode',
-      description: 'Custom assistant mode',
-      systemPrompt: '',
+      id: generateUUID(),
+      name: 'Custom Mode',
+      description: 'A custom mode',
+      systemPrompt: 'You are a helpful assistant.',
       temperature: 0.7,
       icon: '🤖',
       category: 'Custom',
@@ -58,162 +74,179 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ className }) => {
       customInstructions: []
     };
     addCustomMode(newMode);
+    setActiveMode(newMode.id);
     setCustomizingMode(newMode.id);
     setShowModes(false);
   };
 
   return (
-    <header className={cn("h-12 border-b border-border bg-background", className)}>
-      <div className="h-full px-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">GenieAgent</h1>
+    <header 
+      className={cn(
+        "w-full h-16 px-6 flex items-center justify-between",
+        "bg-[--md-sys-color-surface]/98 border-b border-[--md-sys-color-outline-variant]",
+        "shadow-lg",
+        "transition-all duration-300 ease-in-out",
+        className
+      )}
+      style={{
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.14)'
+      }}
+    >
+      {/* Left section */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 group cursor-pointer">
+          <div className="relative">
+            <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full opacity-80 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-300"></div>
+            <div className="relative bg-white dark:bg-gray-900 p-2 rounded-full border border-blue-300 dark:border-blue-800 shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
+              <Bot className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+          </div>
+          <span className="text-lg font-bold text-[--md-sys-color-on-surface] tracking-tight group-hover:text-[--md-sys-color-primary] transition-colors duration-300">
+            GenieAgent
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Mode Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowModes(!showModes)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors",
-                "hover:bg-muted text-foreground"
-              )}
-            >
-              <Bot className="h-4 w-4" />
-              <span className="text-sm">{currentMode?.name || 'Select Mode'}</span>
-              <ChevronDown className="h-4 w-4" />
-            </button>
-
-            {showModes && (
-              <div className="absolute left-0 mt-2 w-64 rounded-lg border border-border bg-background shadow-lg z-50">
-                <div className="p-2">
-                  <div className="flex items-center justify-between px-2 py-1.5">
-                    <div className="text-xs font-medium text-muted-foreground">Assistant Modes</div>
-                    <button
-                      onClick={handleCreateMode}
-                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/90"
-                    >
-                      <Plus className="h-3 w-3" />
-                      New Mode
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {modes.map((mode) => (
-                      <button
-                        key={mode.id}
-                        onClick={() => {
-                          setActiveMode(mode.id);
-                          setShowModes(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors text-left group",
-                          activeMode === mode.id
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted text-foreground"
-                        )}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{mode.name}</div>
-                          <div className="text-xs truncate text-muted-foreground">
-                            {mode.description}
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCustomizingMode(mode.id);
-                            setShowModes(false);
-                          }}
-                          className={cn(
-                            "p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity",
-                            activeMode === mode.id
-                              ? "hover:bg-primary-foreground/10 text-primary-foreground"
-                              : "hover:bg-muted-foreground/10"
-                          )}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Theme Mode Buttons */}
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <button
-              onClick={() => setMode('light')}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                mode === 'light' ? "bg-background text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Sun className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setMode('dark')}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                mode === 'dark' ? "bg-background text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Moon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setMode('system')}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                mode === 'system' ? "bg-background text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Monitor className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Theme Selector */}
-          <div className="relative">
-            <ThemeSelector />
-          </div>
-
-          {/* Settings Button */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={cn(
-              "p-2 rounded-lg transition-colors",
-              showSettings ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-            )}
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-
-          {/* Fullscreen Button */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </button>
+        {/* Search bar */}
+        <div className={cn(
+          "flex items-center gap-3 px-4 py-2.5 rounded-full",
+          "bg-[--md-sys-color-surface-variant]/80",
+          "border border-[--md-sys-color-outline-variant]",
+          "transition-all duration-300 ease-in-out",
+          "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
+          "focus-within:bg-[--md-sys-color-surface] focus-within:border-[--md-sys-color-primary]/50 focus-within:ring-2 focus-within:ring-[--md-sys-color-primary]/40",
+          "shadow-md hover:shadow-lg",
+          "transform-gpu hover:-translate-y-1",
+          isSearchOpen ? "w-96" : "w-72"
+        )}>
+          <Search className="h-4 w-4 text-[--md-sys-color-on-surface-variant] transition-colors duration-300" />
+          <input
+            type="text"
+            placeholder="Search..."
+            className="bg-transparent w-full text-sm outline-none text-[--md-sys-color-on-surface] placeholder:text-[--md-sys-color-on-surface-variant]/70 transition-colors duration-300"
+            onFocus={() => setIsSearchOpen(true)}
+            onBlur={() => setIsSearchOpen(false)}
+          />
         </div>
       </div>
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="absolute right-4 top-14 w-80 rounded-lg border border-border bg-background shadow-lg z-50">
-          <div className="p-4 space-y-6">
-            <ThemeAnimationControls />
-            <ThemeScheduler />
-            <ThemeSharing />
-          </div>
-        </div>
-      )}
+      {/* Right section */}
+      <div className="flex items-center gap-3">
+        {/* Mode Selector */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-full",
+                "text-sm font-medium",
+                "bg-[--md-sys-color-primary-container]/90 text-[--md-sys-color-on-primary-container]",
+                "border border-[--md-sys-color-primary]/20",
+                "hover:bg-[--md-sys-color-primary-container] hover:border-[--md-sys-color-primary]/40 hover:shadow-xl",
+                "active:scale-95",
+                "transform-gpu hover:-translate-y-1",
+                "transition-all duration-300 ease-in-out"
+              )}
+            >
+              <div className="relative">
+                <div className="absolute -inset-1.5 bg-[--md-sys-color-primary]/40 rounded-full opacity-80 blur-md"></div>
+                <Bot className="h-4 w-4 relative" />
+              </div>
+              <span>{currentMode?.name || 'Select Mode'}</span>
+              <ChevronDown className="h-3.5 w-3.5 opacity-70 transition-transform duration-300 group-hover:rotate-180" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 p-2 rounded-xl shadow-2xl border border-[--md-sys-color-outline-variant] bg-[--md-sys-color-surface]/98 backdrop-blur-xl">
+            {modes.map(mode => (
+              <DropdownMenuItem 
+                key={mode.id}
+                onClick={() => setActiveMode(mode.id)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer",
+                  "text-sm font-medium",
+                  "transition-all duration-200 ease-in-out",
+                  "hover:transform-gpu hover:-translate-y-0.5",
+                  activeMode === mode.id 
+                    ? "bg-[--md-sys-color-primary-container] text-[--md-sys-color-on-primary-container] shadow-lg" 
+                    : "hover:bg-[--md-sys-color-surface-variant] hover:shadow-md"
+                )}
+              >
+                <span className="text-lg">{mode.icon}</span>
+                <span>{mode.name}</span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator className="my-1.5 h-px bg-[--md-sys-color-outline-variant]/50" />
+            <DropdownMenuItem 
+              onClick={handleCreateMode}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm font-medium text-[--md-sys-color-primary] hover:bg-[--md-sys-color-primary]/15 transition-colors duration-200 hover:shadow-md"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create New Mode</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-      {/* Mode Customizer */}
+        {/* Theme Toggle */}
+        <button
+          onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+          className={cn(
+            "p-2.5 rounded-full",
+            "bg-[--md-sys-color-surface-variant]/70",
+            "border border-[--md-sys-color-outline-variant]",
+            "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
+            "hover:shadow-xl active:scale-95",
+            "transform-gpu hover:-translate-y-1",
+            "transition-all duration-300 ease-in-out",
+            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]"
+          )}
+        >
+          {themeMode === 'light' ? (
+            <Sun className="h-5 w-5 transition-transform duration-300 hover:rotate-45" />
+          ) : (
+            <Moon className="h-5 w-5 transition-transform duration-300 hover:rotate-12" />
+          )}
+        </button>
+
+        {/* Settings */}
+        <button
+          className={cn(
+            "p-2.5 rounded-full",
+            "bg-[--md-sys-color-surface-variant]/70",
+            "border border-[--md-sys-color-outline-variant]",
+            "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
+            "hover:shadow-xl active:scale-95",
+            "transform-gpu hover:-translate-y-1",
+            "transition-all duration-300 ease-in-out",
+            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]"
+          )}
+        >
+          <Settings className="h-5 w-5 transition-transform duration-300 hover:rotate-90" />
+        </button>
+
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className={cn(
+            "p-2.5 rounded-full",
+            "bg-[--md-sys-color-surface-variant]/70",
+            "border border-[--md-sys-color-outline-variant]",
+            "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
+            "hover:shadow-xl active:scale-95",
+            "transform-gpu hover:-translate-y-1",
+            "transition-all duration-300 ease-in-out",
+            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]"
+          )}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-5 w-5 transition-transform duration-300 hover:scale-90" />
+          ) : (
+            <Maximize2 className="h-5 w-5 transition-transform duration-300 hover:scale-110" />
+          )}
+          <span className="sr-only">Toggle fullscreen</span>
+        </button>
+      </div>
+
+      {/* Mode Customizer Modal */}
       {customizingMode && (
         <ModeCustomizer
           mode={modes.find(m => m.id === customizingMode)!}
@@ -222,6 +255,4 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ className }) => {
       )}
     </header>
   );
-};
-
-export default HeaderBar; 
+}

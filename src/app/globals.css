@@ -4,61 +4,147 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
+    /* Google Material Design 3 Colors - 20% Darker & More Saturated */
+    --md-sys-color-primary: #0d5bca; /* Darker blue */
+    --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #d1e3fc; /* Slightly darker container */
+    --md-sys-color-on-primary-container: #0d47a1; /* Darker text on container */
+    --md-sys-color-secondary: #0f8c37; /* Darker green */
+    --md-sys-color-on-secondary: #ffffff;
+    --md-sys-color-secondary-container: #c8e6d1; /* Darker secondary container */
+    --md-sys-color-on-secondary-container: #0b5a21; /* Darker text on container */
+    --md-sys-color-tertiary: #e09c00; /* Darker yellow */
+    --md-sys-color-on-tertiary: #ffffff;
+    --md-sys-color-tertiary-container: #ffefc3; /* Darker tertiary container */
+    --md-sys-color-on-tertiary-container: #b36800; /* Darker text on container */
+    --md-sys-color-error: #c62828; /* Darker red */
+    --md-sys-color-on-error: #ffffff;
+    --md-sys-color-error-container: #ffcdd2; /* Darker error container */
+    --md-sys-color-on-error-container: #b71c1c; /* Darker text on container */
+    --md-sys-color-background: #f5f5f5; /* Slightly darker background */
+    --md-sys-color-on-background: #121212; /* Darker text */
+    --md-sys-color-surface: #f5f5f5; /* Slightly darker surface */
+    --md-sys-color-on-surface: #121212; /* Darker text */
+    --md-sys-color-surface-variant: #e0e0e0; /* Darker surface variant */
+    --md-sys-color-on-surface-variant: #424242; /* Darker text */
+    --md-sys-color-outline: #bdbdbd; /* Darker outline */
+    --md-sys-color-outline-variant: #e0e0e0; /* Darker outline variant */
+
+    /* Enhanced Elevation/Shadow tokens for more depth */
+    --md-sys-elevation-1: 0 2px 4px rgba(0,0,0,0.2), 0 1px 5px 1px rgba(0,0,0,0.12);
+    --md-sys-elevation-2: 0 2px 4px rgba(0,0,0,0.2), 0 3px 8px 2px rgba(0,0,0,0.14);
+    --md-sys-elevation-3: 0 6px 10px 3px rgba(0,0,0,0.14), 0 2px 4px rgba(0,0,0,0.2);
+    
+    /* Shape tokens */
+    --md-sys-shape-corner-small: 4px;
+    --md-sys-shape-corner-medium: 8px;
+    --md-sys-shape-corner-large: 16px;
+    --md-sys-shape-corner-extra-large: 28px;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    /* Dark mode - 20% Darker & More Saturated */
+    --md-sys-color-primary: #4285f4; /* More vibrant blue */
+    --md-sys-color-on-primary: #000000;
+    --md-sys-color-primary-container: #0d5bca; /* Darker container */
+    --md-sys-color-on-primary-container: #d1e3fc; /* Lighter text on container */
+    --md-sys-color-secondary: #34a853; /* More vibrant green */
+    --md-sys-color-on-secondary: #000000;
+    --md-sys-color-secondary-container: #0f8c37; /* Darker container */
+    --md-sys-color-on-secondary-container: #c8e6d1; /* Lighter text */
+    --md-sys-color-tertiary: #fbbc05; /* More vibrant yellow */
+    --md-sys-color-on-tertiary: #000000;
+    --md-sys-color-tertiary-container: #e09c00; /* Darker container */
+    --md-sys-color-on-tertiary-container: #ffefc3; /* Lighter text */
+    --md-sys-color-error: #ea4335; /* More vibrant red */
+    --md-sys-color-on-error: #000000;
+    --md-sys-color-error-container: #c62828; /* Darker container */
+    --md-sys-color-on-error-container: #ffcdd2; /* Lighter text */
+    --md-sys-color-background: #121212; /* Darker background */
+    --md-sys-color-on-background: #f5f5f5; /* Lighter text */
+    --md-sys-color-surface: #121212; /* Darker surface */
+    --md-sys-color-on-surface: #f5f5f5; /* Lighter text */
+    --md-sys-color-surface-variant: #2c2c2c; /* Darker surface variant */
+    --md-sys-color-on-surface-variant: #bdbdbd; /* Lighter text */
+    --md-sys-color-outline: #424242; /* Darker outline */
+    --md-sys-color-outline-variant: #2c2c2c; /* Darker outline variant */
+
+    /* Enhanced Elevation/Shadow tokens for dark mode */
+    --md-sys-elevation-1: 0 2px 4px rgba(0,0,0,0.4), 0 1px 5px 1px rgba(0,0,0,0.3);
+    --md-sys-elevation-2: 0 2px 4px rgba(0,0,0,0.4), 0 3px 8px 2px rgba(0,0,0,0.3);
+    --md-sys-elevation-3: 0 6px 10px 3px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.4);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-[--md-sys-color-outline];
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[--md-sys-color-background] text-[--md-sys-color-on-background];
   }
 }
 
+/* Enhanced animations */
+.animate-fade-in {
+  animation: fadeIn 200ms ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 200ms ease-out;
+}
+
+.animate-scale {
+  animation: scale 200ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scale {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Google-style transitions */
+.transition-google {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+.hover-elevation {
+  transition: box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-elevation:hover {
+  box-shadow: var(--md-sys-elevation-2);
+}
+
 /* Layout styles */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background-color 200ms;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background-color: var(--md-sys-color-primary);
+  opacity: 0.1;
+}
+
 .resize-active {
   user-select: none;
   cursor: ew-resize !important;
@@ -111,17 +197,6 @@
   }
 }
 
-@keyframes fade-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 @keyframes bounce-in {
   0% {
     transform: scale(0.3);
@@ -144,10 +219,6 @@
 
 .animate-slide-in-right {
   animation: slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .animate-bounce-in {

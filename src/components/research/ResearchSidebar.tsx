@@ -17,6 +17,16 @@ interface BotChain {
   isRunning: boolean;
 }
 
+// Add UUID generation function for browser compatibility
+function generateUUID() {
+  // Simple UUID generation that doesn't rely on crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function ResearchSidebar() {
   const [chains, setChains] = useState<BotChain[]>([]);
   const [activeChainId, setActiveChainId] = useState<string | null>(null);
@@ -27,7 +37,7 @@ export default function ResearchSidebar() {
     if (!newChainName.trim()) return;
 
     const newChain: BotChain = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name: newChainName.trim(),
       steps: [],
       isRunning: false
@@ -41,7 +51,7 @@ export default function ResearchSidebar() {
 
   const addStep = (chainId: string, type: ResearchStep['type']) => {
     const newStep: ResearchStep = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       type,
       query: '',
       results: '',

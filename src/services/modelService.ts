@@ -222,53 +222,96 @@ export class GeminiService implements ModelService {
       this.initModel();
     }
 
-    try {
-      // Format messages for better continuity
-      const enhancedMessages = messages.map(msg => {
-        if (msg.role === 'system') {
-          return {
-            role: 'user',
-            content: `[System Instruction] ${msg.content}`
-          };
-        }
-        return msg;
-      });
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
+    let success = false;
 
-      // For conversations, use chat
-      const chat = this.model.startChat({
-        history: enhancedMessages.slice(0, -1).map(msg => ({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        }))
-      });
-      
-      // Send the last message and get the streaming response
-      const lastMessage = enhancedMessages[enhancedMessages.length - 1];
-      const streamingResponse = await chat.sendMessageStream(lastMessage.content);
-      
-      let fullResponse = '';
-      for await (const chunk of streamingResponse.stream) {
-        if (chunk.text) {
-          const text = chunk.text();
-          fullResponse += text;
-          yield text;
-        }
-      }
-
-      // Check if response was cut off and continue if needed
-      if (fullResponse.endsWith('...') || fullResponse.endsWith('…') || !fullResponse.trim().endsWith('.')) {
-        console.log('Response appears to be cut off, attempting to continue...');
-        const continuationResponse = await chat.sendMessageStream('Please continue your previous response.');
-        for await (const chunk of continuationResponse.stream) {
-          if (chunk.text) {
-            const text = chunk.text();
-            yield text;
+    while (!success && retryCount < MAX_RETRIES) {
+      try {
+        // Format messages for better continuity
+        const enhancedMessages = messages.map(msg => {
+          if (msg.role === 'system') {
+            return {
+              role: 'user',
+              content: `[System Instruction] ${msg.content}`
+            };
           }
+          return msg;
+        });
+
+        // For conversations, use chat
+        const chat = this.model.startChat({
+          history: enhancedMessages.slice(0, -1).map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          }))
+        });
+        
+        // Send the last message and get the streaming response
+        const lastMessage = enhancedMessages[enhancedMessages.length - 1];
+        const streamingResponse = await chat.sendMessageStream(lastMessage.content);
+        
+        let fullResponse = '';
+        try {
+          for await (const chunk of streamingResponse.stream) {
+            if (chunk.text) {
+              const text = chunk.text();
+              fullResponse += text;
+              yield text;
+            }
+          }
+          
+          // Check if response was cut off and continue if needed
+          if (fullResponse.endsWith('...') || fullResponse.endsWith('…') || !fullResponse.trim().endsWith('.')) {
+            console.log('Response appears to be cut off, attempting to continue...');
+            try {
+              const continuationResponse = await chat.sendMessageStream('Please continue your previous response.');
+              for await (const chunk of continuationResponse.stream) {
+                if (chunk.text) {
+                  const text = chunk.text();
+                  yield text;
+                }
+              }
+            } catch (continuationError) {
+              console.warn('Failed to get continuation, but returning partial response:', continuationError);
+              // We'll still consider this a success since we got the initial response
+            }
+          }
+          
+          success = true; // Mark as successful if we get here
+        } catch (streamError) {
+          console.error('Stream processing error:', streamError);
+          if (fullResponse.length > 0) {
+            console.log('Returning partial response despite stream error');
+            success = true; // Consider it a success if we got some response
+            return;
+          }
+          throw streamError; // Re-throw if we got no response at all
+        }
+      } catch (error) {
+        retryCount++;
+        console.error(`Gemini API Error (attempt ${retryCount}/${MAX_RETRIES}):`, error);
+        
+        if (retryCount >= MAX_RETRIES) {
+          // If this was our last retry, throw the error
+          throw new Error(error instanceof Error ? error.message : 'Failed to generate response after multiple attempts');
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // For retries, simplify the prompt slightly to avoid potential issues
+        if (messages.length > 2 && retryCount > 1) {
+          console.log('Simplifying prompt for retry...');
+          // Keep system message and last user message only
+          messages = messages.filter(msg => 
+            msg.role === 'system' || 
+            msg === messages[messages.length - 1]
+          );
         }
       }
-    } catch (error) {
-      console.error('Gemini API Error:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to generate response');
     }
   }
 

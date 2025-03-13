@@ -39,6 +39,16 @@ interface Agent {
   createdAt: string;
 }
 
+// Add UUID generation function for browser compatibility
+function generateUUID() {
+  // Simple UUID generation that doesn't rely on crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function GenieAgentDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('builder');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -121,7 +131,7 @@ export default function GenieAgentDashboard() {
     setLoadingState('loading');
     try {
       const agent = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         type: selectedTemplate.type,
         name: formData.name.trim(),
         description: formData.description.trim(),

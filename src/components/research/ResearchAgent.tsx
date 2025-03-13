@@ -3,6 +3,16 @@ import { Search, Plus, X, Play, Save, Clock, Share2, Bot } from 'lucide-react';
 import { useAgentStore } from '../store/agentStore';
 import { ResearchResult } from '../types';
 
+// Add UUID generation function for browser compatibility
+function generateUUID() {
+  // Simple UUID generation that doesn't rely on crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function ResearchAgent() {
   const { 
     researchAgents, 
@@ -75,7 +85,7 @@ export default function ResearchAgent() {
       const flow = createFlow(newFlowName, newFlowDescription);
       // Add research step with the current query
       flow.steps.push({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         type: 'research',
         name: 'Research',
         description: quickSearchResult.query,

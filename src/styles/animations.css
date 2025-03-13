@@ -583,4 +583,94 @@
 
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out forwards;
+}
+
+/* Theme Transition Variables */
+:root {
+  --theme-transition-duration: 0.3s;
+  --theme-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+  --theme-overlay-opacity: 0.5;
+}
+
+/* Theme Transition Animations */
+@keyframes themeTransitionIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--theme-overlay-opacity);
+  }
+}
+
+@keyframes themeTransitionOut {
+  from {
+    opacity: var(--theme-overlay-opacity);
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Theme Change Overlay */
+.theme-transition-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--background);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9999;
+  transition: opacity var(--theme-transition-duration) var(--theme-transition-timing);
+}
+
+.theme-changing .theme-transition-overlay {
+  animation: themeTransitionIn var(--theme-transition-duration) var(--theme-transition-timing) forwards;
+}
+
+/* Material Effects */
+.material-glass {
+  background: rgba(var(--card), 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(var(--border), 0.1);
+}
+
+.material-frosted {
+  background: rgba(var(--card), 0.8);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(var(--border), 0.2);
+}
+
+.material-glow {
+  box-shadow: 0 0 20px rgba(var(--primary), 0.3);
+}
+
+/* Theme-aware Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-theme-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient Animations */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.gradient-animate {
+  background-size: 200% 200%;
+  animation: gradientFlow 3s ease infinite;
 } 

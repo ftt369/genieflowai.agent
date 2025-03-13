@@ -1,13 +1,13 @@
-// Theme-related stores
+// Core stores
 export * from './theme/themeStore';
-export * from './theme/overlayStore';
-
-// Model-related stores
 export * from './model/modelStore';
 export * from './model/modeStore';
-
-// Chat-related stores
 export * from './chat/chatStore';
+
+// UI stores
+export * from './ui/sidebarStore';
+
+// Feature stores
 export * from './promptStore';
 
 // Other stores

@@ -1059,4 +1059,37 @@ body {
 
 .material-interactive.material-water:hover::before {
   animation-duration: 4s;
+}
+
+/* Add enhanced shadow effects */
+:root {
+  --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-medium: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.08);
+  --shadow-dark: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Apply shadows to components */
+.header-container {
+  box-shadow: var(--shadow-medium);
+}
+
+.card {
+  box-shadow: var(--shadow-light);
+}
+
+.button {
+  box-shadow: var(--shadow-dark);
+}
+
+/* Ensure dark mode compatibility */
+[data-theme='dark'] .header-container {
+  box-shadow: var(--shadow-dark);
+}
+
+[data-theme='dark'] .card {
+  box-shadow: var(--shadow-medium);
+}
+
+[data-theme='dark'] .button {
+  box-shadow: var(--shadow-dark);
 } 
