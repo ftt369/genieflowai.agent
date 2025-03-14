@@ -1,9 +1,25 @@
 import { saveAs } from 'file-saver';
 import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
+import * as mammoth from 'mammoth';
+import { createWorker } from 'tesseract.js';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+import { useDocumentStore } from '../stores/documentStore';
+import { nanoid } from 'nanoid';
 
 // Set the PDF.js worker source
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Initialize Tesseract worker
+let tesseractWorker: any = null;
+
+async function initTesseractWorker() {
+  if (!tesseractWorker) {
+    tesseractWorker = await createWorker();
+    await tesseractWorker.loadLanguage('eng');
+    await tesseractWorker.initialize('eng');
+  }
+  return tesseractWorker;
+}
 
 /**
  * Extracts text content from various file types
@@ -11,111 +27,33 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
  * @returns A promise that resolves to the extracted text
  */
 export const extractFileContent = async (file: File): Promise<string> => {
-  console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
-  
+  const type = file.type;
+
   try {
-    // For text-based files, use simple text extraction
-    if (file.type.startsWith('text/') || 
-        file.type.includes('json') || 
-        file.type.includes('javascript') || 
-        file.type.includes('typescript') || 
-        file.type.includes('xml') || 
-        file.type.includes('html') || 
-        file.type.includes('css')) {
-      console.log(`Reading ${file.name} as text`);
-      return await readAsText(file);
+    // Handle PDFs
+    if (type === 'application/pdf') {
+      return await extractPDFContent(file);
     }
-    
-    // For PDF files, use PDF.js
-    if (file.type.includes('pdf')) {
-      try {
-        console.log(`Extracting PDF text from ${file.name}`);
-        const text = await extractPdfText(file);
-        console.log(`PDF text extracted successfully from ${file.name}, length: ${text.length} characters`);
-        return text;
-      } catch (error: any) {
-        console.error(`Error extracting PDF text from ${file.name}:`, error);
-        return `[PDF Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
-      }
+
+    // Handle images with OCR
+    if (type.startsWith('image/')) {
+      return await extractImageText(file);
     }
-    
-    // For Word documents, use Mammoth.js
-    if (file.type.includes('word') || file.type.includes('msword') || 
-        file.type.includes('officedocument.wordprocessingml')) {
-      try {
-        console.log(`Extracting Word document text from ${file.name}`);
-        const text = await extractWordText(file);
-        console.log(`Word document text extracted successfully from ${file.name}, length: ${text.length} characters`);
-        return text;
-      } catch (error: any) {
-        console.error(`Error extracting Word text from ${file.name}:`, error);
-        return `[Word Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
-      }
+
+    // Handle text-based files
+    if (type.includes('text') || type.includes('javascript') || type.includes('json') || type.includes('xml')) {
+      return await readTextFile(file);
     }
-    
-    // For other file types, return a placeholder with file info
-    if (file.type.includes('excel') || file.type.includes('spreadsheetml')) {
-      return `[Excel Document: ${file.name}] - Size: ${formatFileSize(file.size)}`;
+
+    // Handle Microsoft Office documents
+    if (type.includes('officedocument') || type.includes('msword')) {
+      return await extractOfficeContent(file);
     }
-    
-    if (file.type.includes('powerpoint') || file.type.includes('presentationml')) {
-      return `[PowerPoint Document: ${file.name}] - Size: ${formatFileSize(file.size)}`;
-    }
-    
-    if (file.type.startsWith('image/')) {
-      return `[Image: ${file.name}] - Size: ${formatFileSize(file.size)}`;
-    }
-    
-    if (file.type.startsWith('audio/')) {
-      return `[Audio: ${file.name}] - Size: ${formatFileSize(file.size)}`;
-    }
-    
-    if (file.type.startsWith('video/')) {
-      return `[Video: ${file.name}] - Size: ${formatFileSize(file.size)}`;
-    }
-    
-    // If file type is empty or unknown, try to determine by extension
-    if (!file.type || file.type === 'application/octet-stream') {
-      const extension = file.name.split('.').pop()?.toLowerCase() || '';
-      console.log(`File ${file.name} has unknown MIME type, extension: ${extension}`);
-      
-      if (extension === 'pdf') {
-        try {
-          console.log(`Attempting to extract PDF text from ${file.name} based on extension`);
-          const text = await extractPdfText(file);
-          console.log(`PDF text extracted successfully from ${file.name}, length: ${text.length} characters`);
-          return text;
-        } catch (error: any) {
-          console.error(`Error extracting PDF text from ${file.name} based on extension:`, error);
-          return `[PDF Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
-        }
-      }
-      
-      if (extension === 'docx' || extension === 'doc') {
-        try {
-          console.log(`Attempting to extract Word document text from ${file.name} based on extension`);
-          const text = await extractWordText(file);
-          console.log(`Word document text extracted successfully from ${file.name}, length: ${text.length} characters`);
-          return text;
-        } catch (error: any) {
-          console.error(`Error extracting Word text from ${file.name} based on extension:`, error);
-          return `[Word Document: ${file.name}] - Error extracting content: ${error.message || 'Unknown error'}`;
-        }
-      }
-      
-      // Try to read as text for common text formats
-      if (['txt', 'md', 'js', 'ts', 'html', 'css', 'json', 'xml'].includes(extension)) {
-        console.log(`Reading ${file.name} as text based on extension`);
-        return await readAsText(file);
-      }
-    }
-    
-    // Default for other file types
-    console.log(`Using default handling for ${file.name}`);
-    return `[File: ${file.name}] - Type: ${file.type || 'unknown'}, Size: ${formatFileSize(file.size)}`;
-  } catch (error: any) {
-    console.error(`Error processing file ${file.name}:`, error);
-    return `[Error processing file: ${file.name}] - ${error.message || 'Unknown error'}`;
+
+    throw new Error(`Unsupported file type: ${type}`);
+  } catch (error) {
+    console.error('Error extracting file content:', error);
+    throw error;
   }
 };
 
@@ -130,152 +68,125 @@ export const formatFileSize = (bytes: number): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-/**
- * Extracts text from a PDF file using PDF.js
- * @param file The PDF file
- * @returns A promise that resolves to the extracted text
- */
-export const extractPdfText = async (file: File): Promise<string> => {
+async function extractPDFContent(file: File): Promise<string> {
   try {
-    console.log(`Reading ${file.name} as ArrayBuffer for PDF extraction`);
-    const arrayBuffer = await readAsArrayBuffer(file);
-    console.log(`ArrayBuffer created for ${file.name}, size: ${arrayBuffer.byteLength} bytes`);
+    console.log('Starting PDF extraction for:', file.name);
     
-    console.log(`Loading PDF document ${file.name}`);
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    console.log(`PDF document loaded: ${file.name}, pages: ${pdf.numPages}`);
+    // Load the PDF file
+    const arrayBuffer = await file.arrayBuffer();
+    console.log('File loaded as ArrayBuffer, size:', arrayBuffer.byteLength);
+
+    // Create PDF document
+    const loadingTask = getDocument({ data: arrayBuffer });
+    console.log('PDF loading task created');
+
+    const pdf = await loadingTask.promise;
+    console.log('PDF loaded successfully, pages:', pdf.numPages);
+
+    let fullText = '';
     
-    let text = '';
-    
+    // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Processing page ${i} of ${pdf.numPages} in ${file.name}`);
+      console.log(`Processing page ${i} of ${pdf.numPages}`);
       const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const strings = content.items.map((item: any) => item.str);
-      const pageText = strings.join(' ');
-      console.log(`Extracted ${pageText.length} characters from page ${i} of ${file.name}`);
-      text += pageText + '\n\n';
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n\n';
+      console.log(`Page ${i} processed, text length:`, pageText.length);
     }
-    
-    console.log(`Total text extracted from ${file.name}: ${text.length} characters`);
-    return text || `[PDF Document: ${file.name} - No text content found]`;
-  } catch (error: any) {
-    console.error(`PDF extraction error for ${file.name}:`, error);
-    throw new Error(`Failed to extract PDF text: ${error.message || 'Unknown error'}`);
-  }
-};
 
-/**
- * Extracts text from a Word document using Mammoth.js
- * @param file The Word document
- * @returns A promise that resolves to the extracted text
- */
-export const extractWordText = async (file: File): Promise<string> => {
+    // Check if text was successfully extracted
+    if (!fullText.trim()) {
+      console.log('No text found in PDF, attempting OCR...');
+      return await performOCROnPDF(file);
+    }
+
+    console.log('PDF text extraction completed, total length:', fullText.length);
+    return fullText.trim();
+  } catch (error: any) {
+    console.error('Error in PDF extraction:', error);
+    // Try OCR as fallback
+    try {
+      console.log('Attempting OCR fallback...');
+      return await performOCROnPDF(file);
+    } catch (ocrError: any) {
+      console.error('OCR fallback failed:', ocrError);
+      throw new Error(`Failed to extract PDF content: ${error.message}`);
+    }
+  }
+}
+
+async function performOCROnPDF(file: File): Promise<string> {
   try {
-    console.log(`Reading ${file.name} as ArrayBuffer for Word extraction`);
-    const arrayBuffer = await readAsArrayBuffer(file);
-    console.log(`ArrayBuffer created for ${file.name}, size: ${arrayBuffer.byteLength} bytes`);
+    console.log('Starting OCR process for PDF:', file.name);
+    const worker = await initTesseractWorker();
     
-    console.log(`Extracting text from Word document ${file.name}`);
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    console.log(`Word text extracted from ${file.name}, length: ${result.value.length} characters`);
-    
-    return result.value || `[Word Document: ${file.name} - No text content found]`;
-  } catch (error: any) {
-    console.error(`Word extraction error for ${file.name}:`, error);
-    throw new Error(`Failed to extract Word document text: ${error.message || 'Unknown error'}`);
-  }
-};
+    // Load the PDF
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
 
-/**
- * Reads a file as text
- * @param file The file to read
- * @returns A promise that resolves to the file content as text
- */
-export const readAsText = (file: File): Promise<string> => {
+    // Process each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      console.log(`Processing page ${i} with OCR`);
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+      
+      // Create canvas and render PDF page
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      await page.render({
+        canvasContext: context!,
+        viewport: viewport
+      }).promise;
+
+      // Perform OCR on the rendered page
+      console.log(`Running OCR on page ${i}`);
+      const { data: { text } } = await worker.recognize(canvas);
+      fullText += text + '\n\n';
+      console.log(`OCR completed for page ${i}, text length:`, text.length);
+    }
+
+    console.log('OCR process completed, total length:', fullText.length);
+    return fullText.trim();
+  } catch (error: any) {
+    console.error('Error in OCR process:', error);
+    throw new Error(`OCR processing failed: ${error.message}`);
+  }
+}
+
+async function extractImageText(file: File): Promise<string> {
+  try {
+    const worker = await initTesseractWorker();
+    const imageUrl = URL.createObjectURL(file);
+    const { data: { text } } = await worker.recognize(imageUrl);
+    URL.revokeObjectURL(imageUrl);
+    return text.trim();
+  } catch (error) {
+    console.error('Error extracting image text:', error);
+    throw error;
+  }
+}
+
+async function readTextFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    console.log(`Reading ${file.name} as text`);
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        console.log(`Text read from ${file.name}, length: ${content?.length || 0} characters`);
-        resolve(content || `[Empty file: ${file.name}]`);
-      } catch (error) {
-        console.error(`Error in onload handler for ${file.name}:`, error);
-        reject(error);
-      }
-    };
-    
-    reader.onerror = (e) => {
-      console.error(`Error reading ${file.name} as text:`, e);
-      reject(new Error(`Failed to read file: ${e.toString()}`));
-    };
-    
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = (e) => reject(e);
     reader.readAsText(file);
   });
-};
+}
 
-/**
- * Reads a file as an ArrayBuffer
- * @param file The file to read
- * @returns A promise that resolves to the file content as an ArrayBuffer
- */
-export const readAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
-  return new Promise((resolve, reject) => {
-    console.log(`Reading ${file.name} as ArrayBuffer`);
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as ArrayBuffer;
-        console.log(`ArrayBuffer read from ${file.name}, size: ${content?.byteLength || 0} bytes`);
-        resolve(content);
-      } catch (error) {
-        console.error(`Error in onload handler for ${file.name}:`, error);
-        reject(error);
-      }
-    };
-    
-    reader.onerror = (e) => {
-      console.error(`Error reading ${file.name} as ArrayBuffer:`, e);
-      reject(new Error(`Failed to read file: ${e.toString()}`));
-    };
-    
-    reader.readAsArrayBuffer(file);
-  });
-};
-
-/**
- * Reads a file as a Data URL
- * @param file The file to read
- * @returns A promise that resolves to the file content as a Data URL
- */
-export const readAsDataURL = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    console.log(`Reading ${file.name} as DataURL`);
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        console.log(`DataURL read from ${file.name}, length: ${content?.length || 0} characters`);
-        resolve(content);
-      } catch (error) {
-        console.error(`Error in onload handler for ${file.name}:`, error);
-        reject(error);
-      }
-    };
-    
-    reader.onerror = (e) => {
-      console.error(`Error reading ${file.name} as DataURL:`, e);
-      reject(new Error(`Failed to read file: ${e.toString()}`));
-    };
-    
-    reader.readAsDataURL(file);
-  });
-};
+async function extractOfficeContent(file: File): Promise<string> {
+  // For now, return a message that Office documents are not supported
+  // In a future update, we can add support for Office documents using appropriate libraries
+  return 'Office document content extraction is not yet supported. Please convert to PDF for better results.';
+}
 
 /**
  * Creates a thumbnail for an image file
@@ -354,4 +265,92 @@ export const downloadFile = (content: string | Blob, filename: string, mimeType?
   } else if (content instanceof Blob) {
     saveAs(content, filename);
   }
-}; 
+};
+
+// Clean up function to be called when the application is done with OCR
+export async function cleanupOCR() {
+  if (tesseractWorker) {
+    await tesseractWorker.terminate();
+    tesseractWorker = null;
+  }
+}
+
+// Function to extract content from a DOC/DOCX file
+async function extractDocContent(file: File): Promise<string> {
+  try {
+    console.log(`Extracting content from ${file.name} using mammoth...`);
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    console.log(`Mammoth extraction result, length: ${result.value.length} characters`);
+    
+    if (result.value.length < 100) {
+      console.warn('Extracted content is very short, document may be corrupted or protected');
+    }
+    
+    return result.value;
+  } catch (error: any) {
+    console.error('Error extracting DOC content:', error);
+    throw new Error(`Failed to extract content from DOC file: ${error.message}`);
+  }
+}
+
+// Main function to process different file types
+export async function processFile(file: File) {
+  try {
+    console.log(`Processing file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    
+    // Determine file type
+    let fileType = 'unknown';
+    let content = '';
+    
+    // Check file extension and MIME type
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    if (file.type.includes('pdf') || fileExt === 'pdf') {
+      fileType = 'pdf';
+      // Handle PDF files
+      // ... existing PDF handling code
+    } else if (file.type.includes('word') || fileExt === 'doc' || fileExt === 'docx') {
+      fileType = 'document';
+      console.log(`Determined file type: ${fileType}`);
+      console.log(`Extracting content from ${file.name}...`);
+      
+      // Use mammoth for DOC/DOCX extraction
+      content = await extractDocContent(file);
+      
+      console.log(`Content extracted, length: ${content.length} characters`);
+    } 
+    // ... existing code for other file types
+    
+    // Store the document if content was extracted
+    if (content && content.length > 0) {
+      const docId = nanoid();
+      useDocumentStore.getState().addDocument({
+        id: docId,
+        fileName: file.name,
+        fileType: fileType,
+        content: content,
+        createdAt: new Date()
+      });
+      
+      console.log(`Created attachment: ${docId}, name: ${file.name}, content length: ${content.length}`);
+      
+      return {
+        success: true,
+        message: `Successfully processed ${file.name}`,
+        documentId: docId
+      };
+    } else {
+      return {
+        success: false,
+        message: `Failed to extract content from ${file.name}`
+      };
+    }
+  } catch (error: any) {
+    console.error('Error processing file:', error);
+    return {
+      success: false,
+      message: `Error processing file: ${error.message}`
+    };
+  }
+} 

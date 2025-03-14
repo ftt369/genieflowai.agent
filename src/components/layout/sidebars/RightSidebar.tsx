@@ -381,13 +381,13 @@ Remember:
         console.log("Triggering search action for:", question);
         onMainChatInteraction('search', question);
         searchActionTriggered = true;
-      } catch (error) {
+    } catch (error) {
         console.error("Error triggering search action:", error);
         
         // Add an error message to the sidebar
-        const errorMessage: SideMessage = {
+      const errorMessage: SideMessage = {
           id: generateUUID(),
-          role: 'assistant',
+        role: 'assistant',
           content: `Error sending question to main chat. Please try again with a shorter or simpler question.`,
           reference: { type: 'analysis' }
         };
@@ -766,7 +766,7 @@ Respond with ONLY a valid JSON object containing:
   const getTabContent = () => {
     switch (activeTab) {
       case 'chat':
-        return (
+  return (
           <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
               {messages.map((message, index) => (
@@ -793,9 +793,9 @@ Respond with ONLY a valid JSON object containing:
                       <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
                       <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
                         <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                      </div>
-                    </div>
-                  )}
+          </div>
+        </div>
+      )}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -812,9 +812,9 @@ Respond with ONLY a valid JSON object containing:
                       </span>
                       {message.role === 'assistant' && (
                         <div className="flex items-center gap-3">
-                          <button
+          <button
                             onClick={() => handleCopy(message.content, message.id)}
-                            className={cn(
+            className={cn(
                               "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all duration-200",
                               "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
                               "bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700",
@@ -834,13 +834,13 @@ Respond with ONLY a valid JSON object containing:
                                 <span className="font-medium">Copy</span>
                               </>
                             )}
-                          </button>
-                          <button
+          </button>
+          <button
                             onClick={() => {
                               handleCreateWorkflow(message);
                               onMainChatInteraction('workflow', message.content);
                             }}
-                            className={cn(
+            className={cn(
                               "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all duration-200",
                               "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
                               "bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700",
@@ -851,8 +851,8 @@ Respond with ONLY a valid JSON object containing:
                           >
                             <Sparkles className="h-3.5 w-3.5" />
                             <span className="font-medium">Save as Workflow</span>
-                          </button>
-                        </div>
+          </button>
+        </div>
                       )}
                     </div>
                     <div className={cn(
@@ -883,10 +883,10 @@ Respond with ONLY a valid JSON object containing:
                       )}
                     </div>
                   </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
                 </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
           </div>
         );
       case 'research':
@@ -914,34 +914,34 @@ Respond with ONLY a valid JSON object containing:
                                 <li key={stepIndex}>{step}</li>
                               ))}
                             </ul>
-                            <button
+                <button
                               className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
                               onClick={() => handleQuestionClick(`Help me with this workflow: ${workflow.goal}`)}
                             >
                               Send to Chat →
-                            </button>
+                </button>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
+          )}
 
                   {/* Combined Questions Section - Thought Prompts + Suggested Questions */}
                   <div className="mb-6">
                     <h3 className="text-xl font-semibold mb-2">Questions to Explore</h3>
-                    <div className="space-y-2">
+                <div className="space-y-2">
                       {/* Thought Prompts */}
                       {analysisResult.thoughtPrompts && analysisResult.thoughtPrompts.length > 0 && (
                         <>
                           {analysisResult.thoughtPrompts.map((prompt, index) => (
                             <div key={`thought-${index}`} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
                               <p className="text-sm mb-2">{prompt}</p>
-                              <button
+                  <button
                                 className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
                                 onClick={() => handleQuestionClick(prompt)}
-                              >
+                  >
                                 Send to Chat →
-                              </button>
+                  </button>
                             </div>
                           ))}
                         </>
@@ -968,14 +968,14 @@ Respond with ONLY a valid JSON object containing:
                           ))}
                         </>
                       )}
+                </div>
                     </div>
-                  </div>
 
                   {/* Research Gaps - Moved to bottom */}
                   {analysisResult.researchGaps && analysisResult.researchGaps.length > 0 && (
                     <div className="mb-6">
                       <h3 className="text-xl font-semibold mb-2">Research Gaps</h3>
-                      <div className="space-y-2">
+                <div className="space-y-2">
                         {analysisResult.researchGaps.map((gap, index) => (
                           <div key={index} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
                             <p className="text-sm mb-2">{gap}</p>
@@ -1032,8 +1032,8 @@ Respond with ONLY a valid JSON object containing:
                   )}
                     </div>
                   ))}
+              </div>
             </div>
-          </div>
         );
       case 'history':
         return (
@@ -1087,7 +1087,7 @@ Respond with ONLY a valid JSON object containing:
                       <p className="text-xs text-[#5f6368]">
                         Added {new Date(doc.createdAt).toLocaleString()}
                       </p>
-                    </div>
+                  </div>
                     <button
                       onClick={() => setActiveDocumentId(doc.id === activeDocumentId ? null : doc.id)}
                       className="p-1 hover:bg-[#e8f0fe] rounded transition-colors"
@@ -1098,7 +1098,7 @@ Respond with ONLY a valid JSON object containing:
                         <ChevronDown className="h-4 w-4 text-[#5f6368]" />
                       )}
                     </button>
-                  </div>
+                      </div>
 
                   {/* Tags */}
                   {doc.tags.length > 0 && (
@@ -1110,9 +1110,9 @@ Respond with ONLY a valid JSON object containing:
                         >
                           {tag}
                         </span>
-                      ))}
-                    </div>
-                  )}
+              ))}
+                        </div>
+                      )}
 
                   {/* Document Preview */}
                   {activeDocumentId === doc.id && (
@@ -1121,7 +1121,7 @@ Respond with ONLY a valid JSON object containing:
                         <pre className="text-xs whitespace-pre-wrap text-[#202124]">
                           {doc.content.substring(0, 500)}...
                         </pre>
-                      </div>
+                    </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCopy(doc.content, doc.id)}
@@ -1141,14 +1141,14 @@ Respond with ONLY a valid JSON object containing:
                           <Link className="h-3 w-3" />
                           Reference in Chat
                         </button>
-                      </div>
-                    </div>
-                  )}
+                  </div>
+          </div>
+        )}
                       </div>
               ))}
                         </div>
-          </div>
-        );
+      </div>
+  );
       default:
         return null;
     }

@@ -118,7 +118,7 @@ export default function HeaderBar({ className }: HeaderBarProps) {
           "focus-within:bg-[--md-sys-color-surface] focus-within:border-[--md-sys-color-primary]/50 focus-within:ring-2 focus-within:ring-[--md-sys-color-primary]/40",
           "shadow-md hover:shadow-lg",
           "transform-gpu hover:-translate-y-1",
-          isSearchOpen ? "w-96" : "w-72"
+          "w-[400px]"
         )}>
           <Search className="h-4 w-4 text-[--md-sys-color-on-surface-variant] transition-colors duration-300" />
           <input

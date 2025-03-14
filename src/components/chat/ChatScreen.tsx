@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { useModelStore } from '@/stores/model/modelStore';
 import { useModeStore } from '@/stores/model/modeStore';
 import { useThemeStore } from '@/stores/theme/themeStore';
@@ -30,10 +30,13 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { ChatMessage as BaseChatMessage } from '@/types/chat';
-import { extractFileContent, createImageThumbnail } from '../../utils/fileUtils';
+import { extractFileContent, createImageThumbnail, cleanupOCR } from '../../utils/fileUtils';
 import AttachmentPreview from './AttachmentPreview';
 import Notification, { NotificationContainer } from '../ui/Notification';
 import FileDropZone from './FileDropZone';
+import { generateUUID } from '@/utils/uuid';
+import { useDocumentStore } from '@/stores/documentStore';
+import { processFile } from '@/utils/fileUtils';
 
 // Extend the base ChatMessage type with additional properties
 interface ExtendedChatMessage extends Omit<BaseChatMessage, 'role'> {
@@ -72,13 +75,13 @@ interface SpeechRecognition extends EventTarget {
 
 interface Attachment {
   id: string;
-  type: 'image' | 'document' | 'audio' | 'video' | 'other';
   name: string;
+  type: 'image' | 'document' | 'audio' | 'video' | 'other';
+  size: number;
+  content: string;
   url: string;
   thumbnailUrl?: string;
-  size: number;
   mimeType: string;
-  content?: string;
 }
 
 interface VoiceState {
@@ -206,16 +209,6 @@ const parseWorkflowSteps = (input: string): string[] => {
 
   return steps;
 };
-
-// Add UUID generation function for browser compatibility
-function generateUUID() {
-  // Simple UUID generation that doesn't rely on crypto.randomUUID
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
 
 // Update createModeFromDescription function
 const createModeFromDescription = (input: string) => {
@@ -437,126 +430,64 @@ export default function ChatScreen({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const trimmedInput = input?.trim();
-    if ((!trimmedInput && attachments.length === 0) || isLoading || !activeChat) return;
-    
+    if (isLoading || (!input.trim() && attachments.length === 0) || !activeChat) return;
+
     setIsLoading(true);
-    setIsStreaming(true);
-    setStreamingMessage('');
-    
-    // Show notification if processing files
-    if (attachments.length > 0) {
-      const notificationId = generateUUID();
-      setNotifications(prev => [...prev, {
-        id: notificationId,
-        type: 'info',
-        title: 'Processing files',
-        message: `Analyzing ${attachments.length} file(s)...`
-      }]);
-      
-      // Remove notification after 5 seconds
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      }, 5000);
-    }
-    
-    const userMessage: Omit<ChatMessage, 'id'> = {
-      role: 'user',
-      content: trimmedInput || 'Attached file(s) for analysis',
-      timestamp: new Date(),
-      attachments: attachments.length > 0 ? [...attachments] : undefined
-    };
 
     try {
-      // Add user message to chat immediately
+      // Prepare the message content including file contents
+      let messageContent = input.trim();
+      
+      if (attachments.length > 0) {
+        messageContent += '\n\nAttached files:\n';
+        for (const attachment of attachments) {
+          messageContent += `\n${attachment.name}:\n${attachment.content}\n`;
+        }
+      }
+
+      // Add user message to chat
+      const userMessage: ChatMessage = {
+        id: generateUUID(),
+        role: 'user',
+        content: messageContent,
+        timestamp: new Date(),
+      };
+
+      // Add user message
       addMessage(activeChat, userMessage);
       setInput('');
-      setAttachments([]); // Clear attachments after sending
+      setAttachments([]);
 
-      // Get system messages and chat history
-      const systemMessages = getSystemMessages(proprietaryPrompt, activeMode, modes);
-      const chatHistory = chatMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      // Prepare a message that includes file content for the AI
-      let aiMessage = trimmedInput || '';
+      // Get AI response using the existing modelService
+      const response = await modelService.generateChatStream([
+        { role: 'user', content: messageContent }
+      ]);
       
-      // Add file content to the message
-      if (attachments.length > 0) {
-        if (aiMessage) aiMessage += '\n\n';
-        aiMessage += 'Attached files:\n\n';
-        
-        for (const attachment of attachments) {
-          aiMessage += `File: ${attachment.name} (${attachment.type})\n`;
-          if (attachment.content) {
-            aiMessage += `Content:\n${attachment.content}\n\n`;
-          }
-        }
+      let fullResponse = '';
+      for await (const chunk of response) {
+        fullResponse += chunk;
       }
 
-      // Get the stream response
-      let accumulatedResponse = '';
-      let errorOccurred = false;
-      
-      try {
-        // Use the enhanced message with file content
-        const streamResponse = await modelService.generateChatStream([
-          ...systemMessages,
-          ...chatHistory,
-          { role: 'user' as const, content: aiMessage }
-        ]);
-
-        // Handle the streaming response in real-time
-        for await (const chunk of streamResponse) {
-          accumulatedResponse += chunk;
-          setStreamingMessage(accumulatedResponse);
-          // Scroll to bottom smoothly as new content arrives
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-      } catch (streamError) {
-        console.error('Error during streaming:', streamError);
-        errorOccurred = true;
-        
-        // If we have some accumulated response, we'll still use it
-        if (accumulatedResponse.length === 0) {
-          // If we have no response at all, set a generic error message
-          accumulatedResponse = "I'm sorry, I encountered an error while processing your request. Please try again with a simpler query.";
-        } else {
-          // If we have a partial response, append an error notice
-          accumulatedResponse += "\n\n[Note: My response was cut off due to a technical issue. You may want to ask me to continue or rephrase your question.]";
-        }
-      }
-
-      // Add the complete assistant message
-      const assistantMessage = {
-        role: 'assistant' as const,
-        content: formatResponse(accumulatedResponse, proprietaryPrompt?.responseFormat || 'natural')
+      // Add AI response to chat
+      const assistantMessage: ChatMessage = {
+        id: generateUUID(),
+        role: 'assistant',
+        content: fullResponse,
+        timestamp: new Date(),
       };
-      
+
+      // Add assistant message
       addMessage(activeChat, assistantMessage);
-      
-      // If there was an error, add a system message with error details
-      if (errorOccurred) {
-        addMessage(activeChat, {
-          role: 'assistant' as const,
-          content: "There was an issue with the AI's response. You may want to try again with a simpler query or different wording."
-        });
-      }
-    } catch (error) {
-      console.error('Error in chat submission:', error);
-      
-      // Add an error message to the chat
-      addMessage(activeChat, {
-        role: 'assistant' as const,
-        content: "I'm sorry, I encountered an error and couldn't process your request. Please try again."
-      });
+    } catch (error: any) {
+      console.error('Error in chat:', error);
+      setNotifications(prev => [...prev, {
+        id: generateUUID(),
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'Failed to get response'
+      }]);
     } finally {
       setIsLoading(false);
-      setIsStreaming(false);
-      setStreamingMessage('');
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -674,83 +605,114 @@ export default function ChatScreen({
   };
 
   // Enhanced file handling function
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
+    setIsLoading(true);
+    try {
     const newAttachments: Attachment[] = [];
-    const errors: string[] = [];
-    const notificationId = generateUUID();
+      const maxSize = 10 * 1024 * 1024; // 10MB limit
 
-    // Show loading notification
-    setNotifications(prev => [...prev, {
-      id: notificationId,
-      type: 'loading',
-      title: 'Processing files',
-      message: `Processing ${files.length} file(s)...`
-    }]);
-
-    for (const file of files) {
-      try {
-        if (file.size > MAX_FILE_SIZE) {
-          errors.push(`${file.name} is too large (max: ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
+      for (const file of Array.from(files)) {
+        if (file.size > maxSize) {
+          setNotifications(prev => [...prev, {
+            id: generateUUID(),
+            type: 'error',
+            title: 'File too large',
+            message: `${file.name} exceeds the 10MB limit`
+          }]);
           continue;
         }
 
-        // Determine file type
-        const type = Object.entries(ALLOWED_FILE_TYPES).find(([_, types]) => 
-          types.includes(file.type)
-        )?.[0] as Attachment['type'] || 'document';
-
-        // Read file content using our improved utility
-        const content = await extractFileContent(file);
-        const url = URL.createObjectURL(file);
-
-        // For images, create a thumbnail
-        let thumbnailUrl = type === 'image' ? await createImageThumbnail(file) : undefined;
-
-        const attachment: Attachment = {
+        setNotifications(prev => [...prev, {
           id: generateUUID(),
-          type,
+          type: 'info',
+          title: 'Processing file',
+          message: `Extracting content from ${file.name}...`
+        }]);
+
+        try {
+          // Extract content from the file
+          const content = await extractFileContent(file);
+          
+          // Create thumbnail for images
+          let thumbnailUrl = '';
+          if (file.type.startsWith('image/')) {
+            thumbnailUrl = await createImageThumbnail(file);
+          }
+
+          // Determine file type
+          let fileType: Attachment['type'] = 'other';
+          if (file.type.startsWith('image/')) fileType = 'image';
+          else if (file.type.includes('pdf') || file.type.includes('document')) fileType = 'document';
+          else if (file.type.startsWith('audio/')) fileType = 'audio';
+          else if (file.type.startsWith('video/')) fileType = 'video';
+
+          const attachment: Attachment = {
+            id: generateUUID(),
           name: file.name,
-          url,
-          thumbnailUrl,
+            type: fileType,
           size: file.size,
-          mimeType: file.type,
-          content // Store the content for processing
-        };
+            content: content,
+            url: URL.createObjectURL(file),
+            thumbnailUrl: thumbnailUrl,
+          mimeType: file.type
+          };
 
-        newAttachments.push(attachment);
-        
-        // Remove the automatic content addition to input field
-        // This prevents the unwanted message in the question box
-      } catch (error) {
-        errors.push(`Failed to process ${file.name}: ${error}`);
+          newAttachments.push(attachment);
+          
+          setNotifications(prev => [...prev, {
+            id: generateUUID(),
+            type: 'success',
+            title: 'File processed',
+            message: `Successfully extracted content from ${file.name}`
+          }]);
+        } catch (error: any) {
+          console.error('Error processing file:', error);
+          setNotifications(prev => [...prev, {
+            id: generateUUID(),
+            type: 'error',
+            title: 'Processing error',
+            message: `Error processing ${file.name}: ${error.message}`
+          }]);
+        }
       }
-    }
 
-    // Remove loading notification and show result
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-
-    if (errors.length > 0) {
+      setAttachments(prev => [...prev, ...newAttachments]);
+    } catch (error: any) {
+      console.error('Error handling files:', error);
       setNotifications(prev => [...prev, {
         id: generateUUID(),
         type: 'error',
-        title: 'Error processing files',
-        message: errors.join('\n')
+        title: 'Error',
+        message: `Failed to process files: ${error.message}`
       }]);
-    } else if (newAttachments.length > 0) {
-      setNotifications(prev => [...prev, {
-        id: generateUUID(),
-        type: 'success',
-        title: 'Files attached',
-        message: `Successfully attached ${newAttachments.length} file(s)`
-      }]);
+    } finally {
+      setIsLoading(false);
+      if (event.target) {
+        event.target.value = ''; // Reset file input
+      }
     }
-
-    setAttachments(prev => [...prev, ...newAttachments]);
-    event.target.value = ''; // Reset input
   };
+
+  // Clean up function for file URLs and OCR worker
+  useEffect(() => {
+    return () => {
+      // Clean up object URLs
+      attachments.forEach(attachment => {
+        if (attachment.url) {
+          URL.revokeObjectURL(attachment.url);
+        }
+        if (attachment.thumbnailUrl) {
+          URL.revokeObjectURL(attachment.thumbnailUrl);
+        }
+      });
+      
+      // Clean up OCR worker
+      cleanupOCR();
+    };
+  }, []);
 
   // Handle voice recording
   const toggleVoiceRecording = () => {
@@ -1034,9 +996,100 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
     setAttachments(prev => [...prev, ...newAttachments]);
   };
 
+  // Updated file change handler with proper types
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (!activeChat) {
+      console.error('No active chat found');
+      setNotifications(prev => [...prev, {
+        id: generateUUID(),
+        type: 'error',
+        title: 'Error',
+        message: 'No active chat found'
+      }]);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const file = files[0];
+      console.log('Processing file:', file.name);
+
+      // Add user message about the file upload
+      const userMessage = {
+        id: generateUUID(),
+        role: 'user' as const,
+        content: `I'm uploading ${file.name} for analysis.`,
+        timestamp: new Date()
+      };
+      addMessage(activeChat, userMessage);
+
+      // Add initial processing message
+      const processingMessage = {
+        id: generateUUID(),
+        role: 'assistant' as const,
+        content: `Processing "${file.name}"... This may take a moment.`,
+        timestamp: new Date()
+      };
+      addMessage(activeChat, processingMessage);
+
+      const result = await processFile(file);
+      console.log('File processing result:', result);
+      
+      if (result.success && result.documentId) {
+        // Set this document as the current one in the store
+        useDocumentStore.getState().setCurrentDocument(result.documentId);
+        
+        // Add success message
+        const successMessage = {
+          id: generateUUID(),
+          role: 'assistant' as const,
+          content: `I've processed "${file.name}" (${(file.size / 1024 / 1024).toFixed(2)} MB) and stored its contents. You can now ask me questions about this document.`,
+          timestamp: new Date()
+        };
+        addMessage(activeChat, successMessage);
+        
+        // Add another message prompting for questions
+        const promptMessage = {
+          id: generateUUID(),
+          role: 'assistant' as const,
+          content: `What would you like to know about this document?`,
+          timestamp: new Date()
+        };
+        addMessage(activeChat, promptMessage);
+      } else {
+        // Add error message if processing failed
+        const errorMessage = {
+          id: generateUUID(),
+          role: 'assistant' as const,
+          content: `I encountered an error while processing "${file.name}": ${result.message}. Please try again with a different file.`,
+          timestamp: new Date()
+        };
+        addMessage(activeChat, errorMessage);
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      const errorMessage = {
+        id: generateUUID(),
+        role: 'assistant' as const,
+        content: `Sorry, I encountered an error while processing the file: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        timestamp: new Date()
+      };
+      addMessage(activeChat, errorMessage);
+    } finally {
+      setIsLoading(false);
+      // Reset the file input
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   return (
     <div 
-      className="flex flex-col h-full relative"
+      className="flex flex-col h-full w-full relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1069,14 +1122,14 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
 
       {/* Messages Area - Scrollable */}
       <div 
-        className="flex-1 overflow-y-auto min-h-0"
+        className="flex-1 overflow-y-auto min-h-0 w-full"
         style={{
           backgroundColor: 'eggshell',
           overscrollBehavior: 'contain',
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        <div className="h-full px-4 py-6 space-y-6">
+        <div className="h-full w-full px-4 py-6">
           {chatMessages.length === 0 && !isStreaming && (
             <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">
               <div className="text-center">
@@ -1087,7 +1140,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
           )}
           
           {/* Message List */}
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="w-full max-w-[95%] mx-auto space-y-6">
             {chatMessages.map((message: ChatMessage) => (
             <div
               key={message.id}
@@ -1112,8 +1165,8 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                     <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
                     <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
                       <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                    </div>
-                  </div>
+                </div>
+                </div>
                 )}
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center justify-between">
@@ -1122,7 +1175,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                         <>
                           <span className="text-blue-600 dark:text-blue-400 font-semibold">
                             {currentMode?.name || 'Assistant'}
-                          </span>
+                              </span>
                           <div className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
                         </>
                       ) : (
@@ -1154,9 +1207,9 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                             </>
                           )}
                         </button>
-                </div>
+                            </div>
                     )}
-                  </div>
+                            </div>
                   <div className={cn(
                     "prose prose-lg max-w-none",
                     "text-slate-800 dark:text-slate-200",
@@ -1218,7 +1271,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                   <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
                   <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
                     <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                  </div>
+                </div>
                 </div>
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1232,8 +1285,8 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                     dangerouslySetInnerHTML={{ __html: formatStreamingContent(streamingMessage) }}
                   />
                   <span className="inline-block w-1.5 h-4 ml-1 bg-blue-400/40 animate-pulse rounded-sm" />
-                </div>
               </div>
+            </div>
           )}
           </div>
           <div ref={messagesEndRef} />
@@ -1241,10 +1294,10 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur-md">
+      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur-md w-full">
         {/* Attachment Preview */}
         {attachments.length > 0 && (
-          <div className="px-4 py-2 border-b border-border">
+          <div className="w-full max-w-4xl mx-auto px-4 py-2 border-b border-border">
             <div className="flex flex-wrap gap-2">
               {attachments.map((attachment) => (
                 <div key={attachment.id} className="w-48">
@@ -1259,38 +1312,54 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
           </div>
         )}
 
-        {/* Input Form */}
-        <form onSubmit={handleSubmit} className="px-4 py-3">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-center gap-2">
-              {/* File Input with Drag & Drop */}
-              <FileDropZone
-                onFilesAdded={(newAttachments) => {
-                  setAttachments(prev => [...prev, ...newAttachments]);
-                  setNotifications(prev => [...prev, {
-                    id: generateUUID(),
-                    type: 'success',
-                    title: 'Files attached',
-                    message: `Successfully attached ${newAttachments.length} file(s)`
-                  }]);
+        {/* ChatGPT-style Input Form */}
+        <div className="w-full max-w-4xl mx-auto p-4">
+          <form onSubmit={handleSubmit} className="relative">
+            <div className="relative flex items-center w-full rounded-xl border border-border shadow-sm bg-background">
+              {/* Main Input */}
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isLoading && (input.trim() || attachments.length > 0)) {
+                      handleSubmit(e as unknown as FormEvent);
+                    }
+                  }
                 }}
-                onError={(errorMessage) => {
-                  setNotifications(prev => [...prev, {
-                    id: generateUUID(),
-                    type: 'error',
-                    title: 'Error processing files',
-                    message: errorMessage
-                  }]);
+                placeholder={voiceState.isRecording ? 'Listening...' : `Message ${currentMode?.name || 'Assistant'}...`}
+                className="w-full resize-none px-4 py-3 max-h-48 rounded-xl focus:outline-none bg-transparent text-foreground placeholder:text-muted-foreground"
+                rows={1}
+          style={{ 
+                  minHeight: '44px',
+                  height: 'auto',
+                  overflowY: 'hidden'
                 }}
+                disabled={isLoading || voiceState.isRecording}
               />
 
-              {/* Voice Input */}
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 px-3">
+                {/* File Upload Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                  className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                title="Attach files"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+
+                {/* Voice Input Button */}
               <button
                 type="button"
                 onClick={toggleVoiceRecording}
                 className={cn(
                   "p-2 rounded-lg transition-colors",
-                  voiceState.isRecording ? "text-red-500 bg-red-100" : "hover:bg-muted"
+                    voiceState.isRecording 
+                      ? "text-red-500 bg-red-100" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 title={voiceState.isRecording ? "Stop recording" : "Start voice input"}
               >
@@ -1301,72 +1370,36 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                 )}
               </button>
 
-              {/* Export Button */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="p-2 rounded-lg hover:bg-muted transition-colors"
-                  title="Export chat"
-                >
-                  <Download className="w-5 h-5" />
-                </button>
-
-                {/* Export Menu */}
-                {showExportMenu && (
-                  <div className="absolute bottom-full left-0 mb-2 p-2 bg-background border border-border rounded-lg shadow-lg z-50">
-                    <div className="space-y-1">
-                      {EXPORT_FORMATS.map((format) => (
-                        <button
-                          key={format.type}
-                          onClick={() => handleExport(format.type)}
-                          className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover:bg-muted"
-                        >
-                          <format.icon className="w-4 h-4" />
-                          <span>Export as {format.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Main Input */}
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={voiceState.isRecording ? 'Listening...' : `Message ${currentMode?.name || 'Assistant'}...`}
-                className="flex-1 px-4 py-2 rounded-lg border bg-background/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={isLoading || voiceState.isRecording}
-              />
-
               {/* Send Button */}
               <button
                 type="submit"
                 disabled={isLoading || (!input.trim() && attachments.length === 0)}
                 className={cn(
-                  "px-4 py-2 rounded-lg transition-colors flex items-center justify-center min-w-[48px]",
-                  "bg-primary text-primary-foreground hover:bg-primary/90",
+                    "p-2 rounded-lg transition-colors",
+                    "text-primary hover:text-primary/90",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
                 {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Send className="h-5 w-5" />
+                    <Send className="w-5 h-5" />
                 )}
               </button>
             </div>
-
-            {/* Voice Error Message */}
-            {voiceState.error && (
-              <p className="text-sm text-red-500 mt-2">
-                Error with voice input: {voiceState.error}
-              </p>
-            )}
           </div>
         </form>
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+            accept={Object.values(ALLOWED_FILE_TYPES).flat().join(',')}
+          />
+      </div>
       </div>
 
       {/* Workflow Creation Modal */}

@@ -2,6 +2,7 @@ import { ModelType } from '@stores/model/modelStore';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { generateOpenAIResponse } from '../api/openai';
 import { usePromptStore } from '../stores/promptStore';
+import { useDocumentStore } from '../stores/documentStore';
 
 // Get environment variables
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -228,8 +229,12 @@ export class GeminiService implements ModelService {
 
     while (!success && retryCount < MAX_RETRIES) {
       try {
-        // Format messages for better continuity
-        const enhancedMessages = messages.map(msg => {
+        // Get the current document from the document store
+        const currentDoc = useDocumentStore.getState().getCurrentDocument();
+        
+        // Format messages for better continuity and filter empty messages
+        const validMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
+        const enhancedMessages = validMessages.map(msg => {
           if (msg.role === 'system') {
             return {
               role: 'user',
@@ -239,16 +244,47 @@ export class GeminiService implements ModelService {
           return msg;
         });
 
+        // If there's a current document, prepend it to the messages
+        let messageHistory = [...enhancedMessages];
+        if (currentDoc) {
+          console.log(`Including document in context: ${currentDoc.fileName}, content length: ${currentDoc.content.length}`);
+          // Create a system message that contains the document content
+          const docContext = {
+            role: 'user' as const,
+            content: `[DOCUMENT CONTEXT]
+Document name: ${currentDoc.fileName}
+Document content:
+${currentDoc.content}
+[END DOCUMENT CONTEXT]
+
+Please use this document to answer my questions. Only reference information from this document.`
+          };
+          
+          // Insert at beginning for context
+          messageHistory.unshift(docContext);
+        }
+        
+        // Get proprietary prompt
+        const { proprietaryPrompt } = usePromptStore.getState();
+        
+        // Construct chat history for Gemini (excluding the last message)
+        const chatHistory = messageHistory.slice(0, -1).map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }));
+
         // For conversations, use chat
         const chat = this.model.startChat({
-          history: enhancedMessages.slice(0, -1).map(msg => ({
-            role: msg.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: msg.content }]
-          }))
+          history: chatHistory
         });
         
         // Send the last message and get the streaming response
-        const lastMessage = enhancedMessages[enhancedMessages.length - 1];
+        const lastMessage = messageHistory[messageHistory.length - 1];
+        if (!lastMessage || !lastMessage.content.trim()) {
+          throw new Error('No valid message content to process');
+        }
+
+        console.log(`Sending message to Gemini: ${lastMessage.content.substring(0, 150)}...`);
         const streamingResponse = await chat.sendMessageStream(lastMessage.content);
         
         let fullResponse = '';
@@ -274,7 +310,6 @@ export class GeminiService implements ModelService {
               }
             } catch (continuationError) {
               console.warn('Failed to get continuation, but returning partial response:', continuationError);
-              // We'll still consider this a success since we got the initial response
             }
           }
           
@@ -301,16 +336,6 @@ export class GeminiService implements ModelService {
         const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
         console.log(`Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        
-        // For retries, simplify the prompt slightly to avoid potential issues
-        if (messages.length > 2 && retryCount > 1) {
-          console.log('Simplifying prompt for retry...');
-          // Keep system message and last user message only
-          messages = messages.filter(msg => 
-            msg.role === 'system' || 
-            msg === messages[messages.length - 1]
-          );
-        }
       }
     }
   }
