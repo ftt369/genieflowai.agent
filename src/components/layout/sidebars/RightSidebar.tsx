@@ -1,19 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Bot, History, Send, GripVertical, ChevronRight, ChevronLeft, Loader2, Copy, Sparkles, Check, PlayCircle, PlusCircle, HelpCircle, File, Upload, Link, ChevronUp, ChevronDown, Eraser } from 'lucide-react';
+import { MessageSquare, Bot, History, Send, GripVertical, ChevronRight, ChevronLeft, Loader2, Copy, Sparkles, Check, PlayCircle, PlusCircle, HelpCircle, File, Upload, Link, ChevronUp, ChevronDown, Eraser, FileText } from 'lucide-react';
 import { cn } from '@utils/cn';
 import type { ChatMessage } from '@stores/chat/chatStore';
 import { useModelStore } from '@stores/model/modelStore';
 import { useChatStore } from '@stores/chat/chatStore';
+import { useThemeStore } from '@/stores/theme/themeStore';
+import { type ColorProfile } from '@/config/theme';
 import ChatScreen from '../../chat/ChatScreen';
+import ResearchAssistant from '../../ResearchAssistant';
+import toast from 'react-hot-toast';
 
-// Add color constants
-const GOOGLE_COLORS = {
-  blue: { bg: '#1a73e8', text: '#1967d2' },
-  red: { bg: '#ea4335', text: '#d93025' },
-  yellow: { bg: '#fbbc04', text: '#ea8600' },
-  green: { bg: '#34a853', text: '#137333' },
-  grey: { bg: '#f1f3f4', text: '#5f6368' },
-  border: '#dadce0'
+// Update color constants to match Spiral logo colors
+const SPIRAL_COLORS = {
+  gold: { bg: '#e6b44c', text: '#e6b44c' },
+  blue: { bg: '#53c5eb', text: '#53c5eb' },
+  darkBlue: { bg: '#004080', text: '#004080' },
+  lightGold: { bg: '#f8e8c6', text: '#e6b44c' },
+  lightBlue: { bg: '#e0f5fc', text: '#53c5eb' },
+  border: '#e6b44c'
 };
 
 interface RightSidebarProps {
@@ -23,6 +27,8 @@ interface RightSidebarProps {
   mainChatMessages: any[];
   onMainChatInteraction: (action: 'copy' | 'workflow' | 'attach' | 'search', content: string) => void;
   children?: React.ReactNode;
+  activeTab?: 'chat' | 'research' | 'agent' | 'history' | 'documents';
+  onTabChange?: (tab: 'chat' | 'research' | 'agent' | 'history' | 'documents') => void;
 }
 
 interface SideMessage {
@@ -176,35 +182,60 @@ export default function RightSidebar({
   onWidthChange,
   mainChatMessages,
   onMainChatInteraction,
-  children
+  children,
+  activeTab: parentActiveTab = 'chat',
+  onTabChange
 }: RightSidebarProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const resizerRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'research' | 'agent' | 'history' | 'documents'>('chat');
-  const [messages, setMessages] = useState<SideMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [activeTab, setActiveTab] = useState<'chat' | 'research' | 'agent' | 'history' | 'documents'>(parentActiveTab);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [messages, setMessages] = useState<SideMessage[]>([]);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<SuggestedQuestion[]>([]);
+  const [attachedDocuments, setAttachedDocuments] = useState<AttachedDocument[]>([]);
+  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const { modelService } = useModelStore();
   const {
     chats,
     activeChat,
     clearAllChats
   } = useChatStore();
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [isStepsOpen, setIsStepsOpen] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showWorkflowCreate, setShowWorkflowCreate] = useState(false);
-  const [workflowName, setWorkflowName] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState<SideMessage | null>(null);
-  const [attachedDocuments, setAttachedDocuments] = useState<AttachedDocument[]>([]);
-  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
-  const [suggestedQuestions, setSuggestedQuestions] = useState<SuggestedQuestion[]>([]);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const messageEndRef = useRef<HTMLDivElement>(null);
+
+  const { profile: themeProfile } = useThemeStore();
   
+  // Check if we're using the Office theme profile
+  const isOfficeStyle = themeProfile === 'office' as ColorProfile;
+  // Check if we're using the Spiral theme profile
+  const isSpiralStyle = themeProfile === 'spiral' as ColorProfile;
+
+  // Update activeTab when parentActiveTab changes
+  useEffect(() => {
+    if (parentActiveTab) {
+      setActiveTab(parentActiveTab);
+    }
+  }, [parentActiveTab]);
+  
+  // Notify parent when activeTab changes
+  const handleTabChange = (tab: 'chat' | 'research' | 'agent' | 'history' | 'documents') => {
+    setActiveTab(tab);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
+
   const sidebarRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const startResizeX = useRef<number>(0);
@@ -261,77 +292,21 @@ export default function RightSidebar({
     document.body.style.cursor = 'ew-resize';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isProcessing) return;
-
-    const userMessage: SideMessage = {
+    
+    // Add your message handling logic here
+    const newMessage: SideMessage = {
       id: generateUUID(),
-      content: inputValue,
-      role: 'user'
+      role: 'user',
+      content: inputValue
     };
-
-    setMessages(prev => [...prev, userMessage]);
+    
+    setMessages(prev => [...prev, newMessage]);
     setInputValue('');
-    setIsProcessing(true);
-
-    try {
-      // Create streaming message
-      const streamingId = generateUUID();
-      const streamingMessage: SideMessage = {
-        id: streamingId,
-        role: 'assistant',
-        content: '',
-        reference: { type: 'analysis' }
-      };
-      setMessages(prev => [...prev, streamingMessage]);
-
-      // Prepare context with main chat messages
-      const context = [
-        {
-          role: 'system' as const,
-          content: `You are a helpful AI assistant that can analyze the main conversation and answer questions about it, or help with any other topics. 
-          
-Current main conversation context:
-${mainChatMessages.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
-
-Remember:
-1. You can reference and analyze the main conversation
-2. You can also help with new, unrelated topics
-3. Be clear when you're referencing the main conversation vs discussing new topics`
-        },
-        ...messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        { role: 'user' as const, content: inputValue }
-      ];
-
-      // Stream the response
-      const stream = await modelService.generateChatStream(context);
-      let accumulated = '';
-
-      for await (const chunk of stream) {
-        accumulated += chunk;
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === streamingId 
-              ? { ...msg, content: accumulated }
-              : msg
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error in side chat:', error);
-      setMessages(prev => [...prev, {
-        id: generateUUID(),
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        reference: { type: 'analysis' }
-      }]);
-    } finally {
-      setIsProcessing(false);
-    }
+    // Process the message...
   };
 
   const handleCopy = async (content: string, messageId: string) => {
@@ -519,7 +494,7 @@ Content: ${doc.content.substring(0, 1000)}...`;
             reference: doc.id,
             relevance: analysis.relevance || 0.5
           }]);
-        } catch (error) {
+    } catch (error) {
           console.error('Error parsing document analysis:', error);
         }
       }
@@ -763,281 +738,290 @@ Respond with ONLY a valid JSON object containing:
     setIsAnalyzing(false);
   };
 
+  // Handle document processing for AI Assistant
+  const processDocumentTask = (taskType: string) => {
+    // Show feedback that the task is being processed
+    const newMessage: SideMessage = {
+      id: generateUUID(),
+      role: 'assistant',
+      content: `Starting task: ${taskType}. This may take a moment...`,
+      reference: { type: 'analysis' }
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Send the task to the main chat
+    onMainChatInteraction('search', taskType);
+    
+    // Switch to the chat tab after initiating a task
+    handleTabChange('chat');
+  };
+
   const getTabContent = () => {
     switch (activeTab) {
       case 'chat':
   return (
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
-              {messages.map((message, index) => (
+          <div className="flex-1 flex flex-col">
+            <div className={cn(
+              "p-4 border-b",
+              isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
+              isSpiralStyle ? "border-[#e6b44c] bg-white" : 
+              "border-gray-200 bg-white"
+            )}>
+              <h2 className={cn(
+                "text-lg font-medium mb-2",
+                isOfficeStyle ? "text-[#0078d4]" : 
+                isSpiralStyle ? "text-[#004080]" : 
+                ""
+              )}>Chat</h2>
+              <p className="text-sm text-gray-600">
+                Discuss your current conversation or ask questions about anything.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
-                    "flex gap-4 p-6 rounded-2xl transition-all duration-300 ease-in-out",
-                    "border",
-                    message.role === 'assistant' 
-                        ? "bg-slate-200 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700" 
-                        : "bg-slate-300 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700",
-                    "hover:-translate-y-0.5 transform-gpu",
-                    "shadow-[0_10px_40px_rgb(0,0,0,0.12)] dark:shadow-[0_10px_40px_rgb(0,0,0,0.3)]",
-                    "hover:shadow-[0_15px_50px_rgb(0,0,0,0.2)] dark:hover:shadow-[0_15px_50px_rgb(0,0,0,0.4)]"
+                    "p-3 rounded-lg max-w-[80%]",
+                    message.role === 'user' ? (
+                      isOfficeStyle ? "bg-[#deecf9] text-gray-800 ml-auto" : 
+                      isSpiralStyle ? "bg-[#f8e8c6] text-gray-800 ml-auto" : 
+                      "bg-blue-100 text-gray-800 ml-auto"
+                    ) : (
+                      isOfficeStyle ? "bg-white border border-[#e1dfdd]" : 
+                      isSpiralStyle ? "bg-white border border-[#e6b44c]" : 
+                      "bg-white border border-gray-200"
+                    )
                   )}
-                  style={{
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    transform: 'translate3d(0, 0, 0)'
-                  }}
                 >
-                  {message.role === 'assistant' && (
-                    <div className="relative shrink-0">
-                      <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
-                      <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
-                        <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-          </div>
-        </div>
-      )}
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {message.role === 'assistant' ? (
-                          <>
-                            <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                              Assistant
-                            </span>
-                            <div className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
-                          </>
-                        ) : (
-                          <span className="text-slate-600 dark:text-slate-300 font-semibold">You</span>
-                        )}
-                      </span>
-                      {message.role === 'assistant' && (
-                        <div className="flex items-center gap-3">
-          <button
-                            onClick={() => handleCopy(message.content, message.id)}
-            className={cn(
-                              "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all duration-200",
-                              "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
-                              "bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700",
-                              "border border-slate-200 dark:border-slate-600",
-                              "shadow-sm hover:shadow-md transform-gpu hover:-translate-y-0.5"
-                            )}
-                            title="Copy message"
-                          >
-                            {copiedId === message.id ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 text-green-500" />
-                                <span className="text-green-500 font-medium">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3.5 w-3.5" />
-                                <span className="font-medium">Copy</span>
-                              </>
-                            )}
-          </button>
-          <button
-                            onClick={() => {
-                              handleCreateWorkflow(message);
-                              onMainChatInteraction('workflow', message.content);
-                            }}
-            className={cn(
-                              "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all duration-200",
-                              "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
-                              "bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700",
-                              "border border-slate-200 dark:border-slate-600",
-                              "shadow-sm hover:shadow-md transform-gpu hover:-translate-y-0.5"
-                            )}
-                            title="Save as workflow"
-                          >
-                            <Sparkles className="h-3.5 w-3.5" />
-                            <span className="font-medium">Save as Workflow</span>
-          </button>
-        </div>
-                      )}
-                    </div>
+                  {message.content}
+                  {message.reference && (
                     <div className={cn(
-                      "prose prose-lg max-w-none",
-                      "text-slate-800 dark:text-slate-200",
-                      "prose-headings:font-bold prose-headings:border-b prose-headings:border-slate-200 dark:prose-headings:border-slate-700 prose-headings:pb-2 prose-headings:mb-6",
-                      "prose-h1:text-2xl prose-h1:text-blue-700 dark:prose-h1:text-blue-400",
-                      "prose-h2:text-xl prose-h2:text-blue-600 dark:prose-h2:text-blue-500",
-                      "prose-h3:text-lg prose-h3:text-blue-500 dark:prose-h3:text-blue-600",
-                      "prose-p:mb-4 prose-p:leading-relaxed",
-                      "prose-pre:bg-slate-100/80 dark:prose-pre:bg-slate-800/80",
-                      "prose-pre:shadow-inner prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:p-4 prose-pre:rounded-lg",
-                      "prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4 prose-li:mb-2",
-                      "prose-ul:pl-5 prose-ol:pl-5 prose-ul:my-4 prose-ol:my-4",
-                      "prose-table:border-collapse prose-table:w-full prose-table:my-6",
-                      "prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:p-2 prose-th:border prose-th:border-slate-300 dark:prose-th:border-slate-700 prose-th:text-left",
-                      "prose-td:p-2 prose-td:border prose-td:border-slate-200 dark:prose-td:border-slate-700",
-                      "prose-strong:font-bold prose-strong:text-blue-700 dark:prose-strong:text-blue-400",
-                      "prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm",
-                      "font-semibold"
+                      "mt-1 text-xs p-1 rounded",
+                      isOfficeStyle ? "bg-[#f3f2f1] text-[#0078d4]" : 
+                      isSpiralStyle ? "bg-[#f5f1e5] text-[#004080]" : 
+                      "bg-gray-100 text-blue-600"
                     )}>
-                      {message.role === 'assistant' ? (
-                        <div dangerouslySetInnerHTML={{ __html: formatStreamingContent(message.content) }} />
-                      ) : (
-                        message.content.split('\n\n').map((paragraph, index) => (
-                          <p key={index} className="mb-4">{paragraph}</p>
-                        ))
-                      )}
+                      Referencing main chat
                     </div>
-                  </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
+                  )}
                 </div>
+              ))}
+              {isProcessing && (
+                <div className="flex items-center space-x-2 p-3 rounded-lg bg-white border border-gray-200 max-w-[80%]">
+                  <Loader2 className={cn(
+                    "h-4 w-4 animate-spin",
+                    isOfficeStyle ? "text-[#0078d4]" : 
+                    isSpiralStyle ? "text-[#004080]" : 
+                    "text-blue-500"
+                  )} />
+                  <span className="text-sm text-gray-500">AI is thinking...</span>
+                </div>
+              )}
+            </div>
           </div>
         );
       case 'research':
         return (
-          <div className="flex flex-col h-full">
+          <div className="flex-1 flex flex-col">
+            <div className={cn(
+              "p-4 border-b",
+              isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
+              isSpiralStyle ? "border-[#e6b44c] bg-white" : 
+              "border-gray-200 bg-white"
+            )}>
+              <h2 className={cn(
+                "text-lg font-medium mb-2",
+                isOfficeStyle ? "text-[#0078d4]" : 
+                isSpiralStyle ? "text-[#004080]" : 
+                ""
+              )}>Research Assistant</h2>
+              <p className="text-sm text-gray-600">
+                I can analyze your conversation and provide research insights and suggestions.
+              </p>
+            </div>
             <div className="flex-1 overflow-y-auto p-4">
-              {isAnalyzing && (
-                <div className="text-gray-500 italic mb-4">
-                  Analyzing conversation...
+              {isAnalyzing ? (
+                <div className="flex items-center justify-center py-6 text-gray-500">
+                  <Loader2 className={cn(
+                    "h-5 w-5 mr-2 animate-spin",
+                    isOfficeStyle ? "text-[#0078d4]" : 
+                    isSpiralStyle ? "text-[#004080]" : 
+                    "text-blue-500"
+                  )} />
+                  <span>Analyzing conversation...</span>
                 </div>
-              )}
-              
-              {analysisResult && (
-                <>
-                  {/* Suggested Workflows - Moved to top */}
-                  {analysisResult.suggestedWorkflows && analysisResult.suggestedWorkflows.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-xl font-semibold mb-2">Suggested Workflows</h3>
-                      <div className="space-y-3">
-                        {analysisResult.suggestedWorkflows.map((workflow, index) => (
-                          <div key={index} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
-                            <h4 className="font-medium mb-1 text-lg">{workflow.goal}</h4>
-                            <ul className="list-disc list-inside mb-2 text-sm">
-                              {workflow.steps.map((step, stepIndex) => (
-                                <li key={stepIndex}>{step}</li>
-                              ))}
-                            </ul>
-                <button
-                              className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
-                              onClick={() => handleQuestionClick(`Help me with this workflow: ${workflow.goal}`)}
-                            >
-                              Send to Chat →
-                </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-          )}
-
-                  {/* Combined Questions Section - Thought Prompts + Suggested Questions */}
-                  <div className="mb-6">
-                    <h3 className="text-xl font-semibold mb-2">Questions to Explore</h3>
-                <div className="space-y-2">
-                      {/* Thought Prompts */}
-                      {analysisResult.thoughtPrompts && analysisResult.thoughtPrompts.length > 0 && (
-                        <>
-                          {analysisResult.thoughtPrompts.map((prompt, index) => (
-                            <div key={`thought-${index}`} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
-                              <p className="text-sm mb-2">{prompt}</p>
-                  <button
-                                className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
-                                onClick={() => handleQuestionClick(prompt)}
-                  >
-                                Send to Chat →
-                  </button>
-                            </div>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Suggested Questions */}
-                      {suggestedQuestions && suggestedQuestions.length > 0 && (
-                        <>
-                          {suggestedQuestions.map((question, index) => (
-                            <div key={`question-${index}`} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
-                              <p className="text-sm mb-2">{question.text}</p>
-                              <div className="flex gap-2 text-xs text-gray-500 mb-2">
-                                <span>{question.category}</span>
-                                <span>•</span>
-                                <span>{question.complexity}</span>
-                              </div>
-                              <button
-                                className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
-                                onClick={() => handleQuestionClick(question.text)}
-                              >
-                                Send to Chat →
-                              </button>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                </div>
-                    </div>
-
-                  {/* Research Gaps - Moved to bottom */}
-                  {analysisResult.researchGaps && analysisResult.researchGaps.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-xl font-semibold mb-2">Research Gaps</h3>
-                <div className="space-y-2">
-                        {analysisResult.researchGaps.map((gap, index) => (
-                          <div key={index} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white/90 shadow-md">
-                            <p className="text-sm mb-2">{gap}</p>
-                            <button
-                              className="mt-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors"
-                              onClick={() => handleQuestionClick(`How can I address this research gap: ${gap}`)}
-                            >
-                              Send to Chat →
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
+              ) : (
+                <ResearchAssistant 
+                  messages={mainChatMessages}
+                  onSuggestionClick={(suggestion) => {
+                    // Set the input value in the sidebar chat
+                    setInputValue(suggestion);
+                    
+                    // Send this suggestion to the main chat and auto-submit
+                    if (onMainChatInteraction) {
+                      // Log for debugging
+                      console.log('Sending suggestion to main chat:', suggestion);
+                      
+                      // Make sure we're using the right action type - should be 'workflow'
+                      onMainChatInteraction('workflow', suggestion);
+                      
+                      // Show visual feedback that the suggestion was sent
+                      toast.success("Suggestion sent to main chat", {
+                        duration: 2000,
+                        position: 'bottom-right',
+                      });
+                    } else {
+                      console.error('onMainChatInteraction is not defined');
+                      toast.error("Unable to send suggestion to main chat", {
+                        duration: 2000,
+                        position: 'bottom-right',
+                      });
+                    }
+                  }}
+                />
               )}
             </div>
           </div>
         );
       case 'agent':
         return (
-          <div className="space-y-4 bg-white p-4 rounded-lg shadow-sm border border-[#dadce0]">
-                      <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-[#202124]">Saved Workflows</h3>
-              <span className="text-xs text-[#5f6368]">
-                {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}
-                        </span>
+          <div className="flex-1 flex flex-col">
+            <div className="p-4 border-b border-gray-200 bg-white">
+              <h2 className="text-lg font-medium mb-2">AI Assistant</h2>
+              <p className="text-sm text-gray-600">
+                I can suggest tasks and analyze your documents to help you work more efficiently.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Task Suggestions Section */}
+              <div className="mb-4">
+                <h3 className="text-base font-medium mb-3 text-gray-700">Suggested Tasks</h3>
+                <div className="space-y-2">
+                  {attachedDocuments.length > 0 ? (
+                    <>
+                      <button
+                        onClick={() => processDocumentTask('Analyze the key themes across all my uploaded documents')}
+                        className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-[#e1effa] hover:border-[#0078d4] transition-colors"
+                      >
+                        <div className="flex items-start">
+                          <FileText className="h-5 w-5 text-[#0078d4] mr-3 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-[#0078d4]">Analyze Document Themes</h4>
+                            <p className="text-sm text-gray-600 mt-1">Identify key themes and concepts across all uploaded documents</p>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => processDocumentTask('Summarize the content of all my documents')}
+                        className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-[#e1effa] hover:border-[#0078d4] transition-colors"
+                      >
+                        <div className="flex items-start">
+                          <MessageSquare className="h-5 w-5 text-[#0078d4] mr-3 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-[#0078d4]">Generate Executive Summary</h4>
+                            <p className="text-sm text-gray-600 mt-1">Create a concise summary of all document content</p>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => processDocumentTask('Compare and contrast the information in my documents')}
+                        className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-[#e1effa] hover:border-[#0078d4] transition-colors"
+                      >
+                        <div className="flex items-start">
+                          <Bot className="h-5 w-5 text-[#0078d4] mr-3 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-[#0078d4]">Compare Documents</h4>
+                            <p className="text-sm text-gray-600 mt-1">Identify similarities, differences, and contradictions</p>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => processDocumentTask('Extract actionable insights from all documents')}
+                        className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-[#e1effa] hover:border-[#0078d4] transition-colors"
+                      >
+                        <div className="flex items-start">
+                          <Sparkles className="h-5 w-5 text-[#0078d4] mr-3 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-[#0078d4]">Extract Actionable Insights</h4>
+                            <p className="text-sm text-gray-600 mt-1">Highlight key findings and next steps from your documents</p>
+                          </div>
+                        </div>
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-500 text-sm mb-3">Upload documents to get AI-powered task suggestions</p>
+                      <button
+                        onClick={() => handleTabChange('documents')}
+                        className="px-4 py-2 bg-[#0078d4] text-white rounded-sm hover:bg-[#106ebe] transition-colors text-sm"
+                      >
+                        Go to Documents
+                      </button>
                     </div>
-            <div className="space-y-3">
-              {workflows.map(workflow => (
-                <div
-                  key={workflow.id}
-                  className="p-3 rounded-lg border border-[#dadce0] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium text-[#202124]">{workflow.name}</h4>
-                      <p className="text-xs text-[#5f6368] mt-1">
-                        Created {new Date(workflow.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => runWorkflow(workflow)}
-                      className="p-1 hover:bg-[#e8f0fe] rounded transition-colors"
-                      disabled={isProcessing}
-                    >
-                      <PlayCircle className="h-4 w-4 text-[#1a73e8]" />
-                    </button>
-                  </div>
-                  {workflow.lastRun && (
-                    <p className="text-xs text-[#5f6368] mt-2">
-                      Last run: {new Date(workflow.lastRun).toLocaleString()}
-                    </p>
                   )}
+                </div>
+              </div>
+            
+              {/* Saved Workflows Section */}
+              <div className="mt-6">
+                <h3 className="text-base font-medium mb-3 text-gray-700">Saved Workflows</h3>
+                <div className="space-y-3">
+                  {workflows.length > 0 ? (
+                    workflows.map(workflow => (
+                      <div
+                        key={workflow.id}
+                        className="p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-800">{workflow.name}</h4>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Created {new Date(workflow.createdAt).toLocaleDateString()}
+                            </p>
+          </div>
+                          <button
+                            onClick={() => runWorkflow(workflow)}
+                            className="p-1 hover:bg-[#e1effa] rounded transition-colors"
+                            disabled={isProcessing}
+                          >
+                            <PlayCircle className="h-4 w-4 text-[#0078d4]" />
+                          </button>
+        </div>
+                        {workflow.lastRun && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Last run: {new Date(workflow.lastRun).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-500 text-sm">No workflows saved yet. Chat responses can be saved as workflows.</p>
                     </div>
-                  ))}
+                  )}
+                </div>
               </div>
             </div>
+          </div>
         );
       case 'history':
         return (
-          <div className="space-y-4">
+          <div className="p-4 space-y-4">
+            {/* History content goes here */}
+            <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500 text-sm">Chat history will be displayed here</p>
+            </div>
+          </div>
+        );
+      case 'documents':
+        return (
+          <div className="p-4 space-y-4">
             {/* Document Upload */}
             <div className="flex items-center gap-2">
               <input
@@ -1050,25 +1034,11 @@ Respond with ONLY a valid JSON object containing:
               />
               <label
                 htmlFor="document-upload"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-[#dadce0] hover:bg-[#f8f9fa] transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer"
               >
-                <Upload className="h-4 w-4 text-[#1a73e8]" />
-                <span className="text-sm text-[#202124]">Attach Documents</span>
+                <Upload className="h-4 w-4 text-[#0078d4]" />
+                <span className="text-sm text-gray-700">Attach Documents</span>
               </label>
-              
-              {/* Search Documents */}
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search documents..."
-                  className="w-full px-4 py-2 rounded-lg border border-[#dadce0] bg-white text-[#202124] placeholder:text-[#5f6368] focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent"
-                />
-                {isSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-[#5f6368]" />
-                )}
-              </div>
             </div>
 
             {/* Document List */}
@@ -1077,28 +1047,28 @@ Respond with ONLY a valid JSON object containing:
                 <div
                   key={doc.id}
                   className={cn(
-                    "p-4 rounded-lg border border-[#dadce0] transition-colors",
-                    activeDocumentId === doc.id ? "bg-[#f8f9fa]" : "bg-white hover:bg-[#f8f9fa]"
+                    "p-4 rounded-lg border border-gray-200 transition-colors",
+                    activeDocumentId === doc.id ? "bg-gray-50" : "bg-white hover:bg-gray-50"
                   )}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <h4 className="font-medium text-[#202124]">{doc.name}</h4>
-                      <p className="text-xs text-[#5f6368]">
+                      <h4 className="font-medium text-gray-800">{doc.name}</h4>
+                      <p className="text-xs text-gray-500">
                         Added {new Date(doc.createdAt).toLocaleString()}
                       </p>
-                  </div>
-                    <button
+                    </div>
+      <button
                       onClick={() => setActiveDocumentId(doc.id === activeDocumentId ? null : doc.id)}
-                      className="p-1 hover:bg-[#e8f0fe] rounded transition-colors"
-                    >
+                      className="p-1 hover:bg-[#e1effa] rounded transition-colors"
+      >
                       {activeDocumentId === doc.id ? (
-                        <ChevronUp className="h-4 w-4 text-[#1a73e8]" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-[#5f6368]" />
-                      )}
-                    </button>
-                      </div>
+                        <ChevronUp className="h-4 w-4 text-[#0078d4]" />
+        ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+        )}
+      </button>
+                  </div>
 
                   {/* Tags */}
                   {doc.tags.length > 0 && (
@@ -1106,29 +1076,29 @@ Respond with ONLY a valid JSON object containing:
                       {doc.tags.map((tag, i) => (
                         <span
                           key={i}
-                          className="px-2 py-0.5 text-xs rounded-full bg-[#e8f0fe] text-[#1967d2]"
+                          className="px-2 py-0.5 text-xs rounded-full bg-[#e1effa] text-[#0078d4]"
                         >
                           {tag}
                         </span>
-              ))}
-                        </div>
-                      )}
+                      ))}
+                    </div>
+                  )}
 
                   {/* Document Preview */}
                   {activeDocumentId === doc.id && (
                     <div className="mt-4 space-y-2">
-                      <div className="max-h-48 overflow-y-auto rounded bg-[#f8f9fa] p-3 border border-[#dadce0]">
-                        <pre className="text-xs whitespace-pre-wrap text-[#202124]">
+                      <div className="max-h-48 overflow-y-auto rounded bg-gray-50 p-3 border border-gray-200">
+                        <pre className="text-xs whitespace-pre-wrap text-gray-700">
                           {doc.content.substring(0, 500)}...
                         </pre>
-                    </div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCopy(doc.content, doc.id)}
-                          className="flex items-center gap-1 text-xs text-[#5f6368] hover:text-[#202124]"
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                         >
                           {copiedId === doc.id ? (
-                            <Check className="h-3 w-3 text-[#34a853]" />
+                            <Check className="h-3 w-3 text-green-500" />
                           ) : (
                             <Copy className="h-3 w-3" />
                           )}
@@ -1136,19 +1106,25 @@ Respond with ONLY a valid JSON object containing:
                         </button>
                         <button
                           onClick={() => onMainChatInteraction('attach', doc.content)}
-                          className="flex items-center gap-1 text-xs text-[#5f6368] hover:text-[#202124]"
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                         >
                           <Link className="h-3 w-3" />
                           Reference in Chat
                         </button>
-                  </div>
-          </div>
-        )}
                       </div>
+                    </div>
+                  )}
+                </div>
               ))}
-                        </div>
-      </div>
-  );
+              
+              {attachedDocuments.length === 0 && (
+                <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-gray-500 text-sm">No documents attached yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -1156,149 +1132,404 @@ Respond with ONLY a valid JSON object containing:
 
   return (
     <div 
-      ref={sidebarRef}
-      className="h-full flex flex-col relative bg-white"
+      ref={containerRef}
+      className={cn(
+        "h-full overflow-hidden flex flex-col relative",
+        isOpen ? "w-full" : "w-0"
+      )}
+      style={{ width: `${width}px` }}
     >
-      {/* Resize Handle */}
+      <div className={cn(
+        "flex w-full px-3 py-2 border-b space-x-3",
+        isOfficeStyle ? "bg-white border-[#e1dfdd]" : 
+        isSpiralStyle ? "bg-white border-[#e6b44c]" : 
+        "bg-white border-gray-200"
+      )}>
+          <button
+            className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+            activeTab === 'chat' ? (
+              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
+              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
+              "bg-gray-100 text-gray-800"
+            ) : (
+              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
+              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
+              "text-gray-600 hover:bg-gray-100"
+            )
+          )}
+          onClick={() => handleTabChange('chat')}
+        >
+          <MessageSquare className="h-4 w-4 mr-1" />
+          Chat
+          </button>
+          <button
+            className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+            activeTab === 'research' ? (
+              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
+              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
+              "bg-gray-100 text-gray-800"
+            ) : (
+              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
+              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
+              "text-gray-600 hover:bg-gray-100"
+            )
+          )}
+          onClick={() => handleTabChange('research')}
+        >
+          <FileText className="h-4 w-4 mr-1" />
+          Research
+          </button>
+          <button
+            className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+            activeTab === 'agent' ? (
+              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
+              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
+              "bg-gray-100 text-gray-800"
+            ) : (
+              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
+              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
+              "text-gray-600 hover:bg-gray-100"
+            )
+          )}
+          onClick={() => handleTabChange('agent')}
+        >
+          <Sparkles className="h-4 w-4 mr-1" />
+          AI Assistant
+        </button>
+        <button
+          className={cn(
+            "w-8 h-8 flex items-center justify-center rounded-md",
+            isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
+            isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
+            "text-gray-600 hover:bg-gray-100"
+          )}
+          onClick={onClose}
+        >
+          <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+      {/* Resizable Handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-[#dadce0] transition-colors"
+                    className={cn(
+          "absolute top-0 left-0 bottom-0 w-1 cursor-ew-resize transition-colors",
+          isResizing ? (
+            isOfficeStyle ? "bg-[#0078d4]" : 
+            isSpiralStyle ? "bg-[#e6b44c]" : 
+            "bg-blue-500"
+          ) : "bg-transparent hover:bg-gray-300"
+        )}
         onMouseDown={startResize}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Tabs - Fixed at top */}
-        <div className="shrink-0 flex border-b border-[#dadce0] bg-white z-10">
-          <TabButton 
-            icon={<MessageSquare className="h-4 w-4" />} 
-            label="Chat" 
-            isActive={activeTab === 'chat'} 
-            onClick={() => setActiveTab('chat')}
-            color={GOOGLE_COLORS.blue}
-          />
-          <TabButton 
-            icon={<Sparkles className="h-4 w-4" />} 
-            label="Research" 
-            isActive={activeTab === 'research'} 
-            onClick={() => setActiveTab('research')}
-            color={GOOGLE_COLORS.yellow}
-          />
-          <TabButton 
-            icon={<Bot className="h-4 w-4" />} 
-            label="Agent" 
-            isActive={activeTab === 'agent'} 
-            onClick={() => setActiveTab('agent')}
-            color={GOOGLE_COLORS.green}
-          />
-          <TabButton 
-            icon={<History className="h-4 w-4" />} 
-            label="History" 
-            isActive={activeTab === 'history'} 
-            onClick={() => setActiveTab('history')}
-            color={GOOGLE_COLORS.red}
-          />
-          <TabButton 
-            icon={<File className="h-4 w-4" />} 
-            label="Docs" 
-            isActive={activeTab === 'documents'} 
-            onClick={() => setActiveTab('documents')}
-            color={GOOGLE_COLORS.grey}
-          />
-        </div>
+      {/* Content Area */}
+      <div className="flex-1 overflow-hidden">
+        {children}
 
-        {/* Content Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto min-h-0 bg-white">
-          {children}
-          
-          <div className="p-4 space-y-4">
-            {getTabContent()}
-                    </div>
-                  </div>
+        {/* Main Content Based on Tab */}
+        {activeTab === 'chat' && renderChatTab()}
+        {activeTab === 'research' && renderResearchTab()}
+        {activeTab === 'agent' && renderAgentTab()}
+        {activeTab === 'history' && renderHistoryTab()}
+        {activeTab === 'documents' && renderDocumentsTab()}
+                </div>
 
-        {/* Input Area - Fixed at bottom */}
-        {activeTab === 'chat' && (
-          <div className="shrink-0 border-t border-[#dadce0] bg-white shadow-[0_-2px_8px_rgba(60,64,67,0.1)]">
-            <form onSubmit={handleSubmit} className="px-4 py-3 flex gap-2">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                placeholder="Ask about the conversation or anything else..."
-                className="flex-1 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white text-[#202124] placeholder:text-[#5f6368] focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-transparent"
-                disabled={isProcessing}
-              />
-              <button
-                type="submit"
-                disabled={isProcessing || !inputValue.trim()}
-                className={cn(
-                  "px-4 py-2 rounded-lg transition-colors flex items-center justify-center min-w-[48px]",
-                  "bg-[#1a73e8] text-white hover:bg-[#1557b0]",
-                  "disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                )}
-              >
-                {isProcessing ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+      {/* Message Input for Chat Tab */}
+      {activeTab === 'chat' && (
+        <div className={cn(
+          "p-4 border-t",
+          isOfficeStyle ? "border-[#e1dfdd]" : 
+          isSpiralStyle ? "border-[#e6b44c]" : 
+          "border-gray-200"
+        )}>
+          <div className="flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                      <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-2 focus:outline-none"
+                />
+                <button
+              onClick={handleSubmit}
+              disabled={isProcessing || !inputValue.trim()}
+                  className={cn(
+                "p-2 rounded-r-lg",
+                isProcessing ? "opacity-50 cursor-not-allowed" : "",
+                inputValue.trim() ? (
+                  isOfficeStyle ? "bg-[#0078d4] text-white" : 
+                  isSpiralStyle ? "bg-[#004080] text-white" : 
+                  "bg-blue-500 text-white"
                 ) : (
-                  <Send className="h-5 w-5" />
-                )}
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
+                  isOfficeStyle ? "bg-gray-100 text-gray-400" : 
+                  isSpiralStyle ? "bg-gray-100 text-gray-400" : 
+                  "bg-gray-100 text-gray-400"
+                )
+              )}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+                  )}
+                </button>
+                      </div>
+                    </div>
+          )}
+                </div>
+  );
 
-      {/* Clear History Confirmation Modal */}
-      {showClearHistoryConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-[#202124] mb-2">Clear Chat History</h3>
-            <p className="text-sm text-[#5f6368] mb-4">
-              Are you sure you want to clear all chat history? This will delete all chats, including pinned and saved ones. This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowClearHistoryConfirm(false)}
-                className="px-4 py-2 rounded-lg hover:bg-[#f1f3f4] text-[#5f6368]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearHistory}
-                className="px-4 py-2 rounded-lg bg-[#d93025] text-white hover:bg-[#c5221f]"
-              >
-                Clear All History
-              </button>
+  function renderChatTab() {
+    return (
+      <div className="flex-1 flex flex-col">
+        <div className={cn(
+          "p-4 border-b",
+          isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
+          isSpiralStyle ? "border-[#e6b44c] bg-white" : 
+          "border-gray-200 bg-white"
+        )}>
+          <h2 className={cn(
+            "text-lg font-medium mb-2",
+            isOfficeStyle ? "text-[#0078d4]" : 
+            isSpiralStyle ? "text-[#004080]" : 
+            ""
+          )}>Chat</h2>
+          <p className="text-sm text-gray-600">
+            Discuss your current conversation or ask questions about anything.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn(
+                "p-3 rounded-lg max-w-[80%]",
+                message.role === 'user' ? (
+                  isOfficeStyle ? "bg-[#deecf9] text-gray-800 ml-auto" : 
+                  isSpiralStyle ? "bg-[#f8e8c6] text-gray-800 ml-auto" : 
+                  "bg-blue-100 text-gray-800 ml-auto"
+                ) : (
+                  isOfficeStyle ? "bg-white border border-[#e1dfdd]" : 
+                  isSpiralStyle ? "bg-white border border-[#e6b44c]" : 
+                  "bg-white border border-gray-200"
+                )
+              )}
+            >
+              {message.content}
+              {message.reference && (
+                <div className={cn(
+                  "mt-1 text-xs p-1 rounded",
+                  isOfficeStyle ? "bg-[#f3f2f1] text-[#0078d4]" : 
+                  isSpiralStyle ? "bg-[#f5f1e5] text-[#004080]" : 
+                  "bg-gray-100 text-blue-600"
+                )}>
+                  Referencing main chat
+                    </div>
+                      )}
+                    </div>
+                  ))}
+          {isProcessing && (
+            <div className="flex items-center space-x-2 p-3 rounded-lg bg-white border border-gray-200 max-w-[80%]">
+              <Loader2 className={cn(
+                "h-4 w-4 animate-spin",
+                isOfficeStyle ? "text-[#0078d4]" : 
+                isSpiralStyle ? "text-[#004080]" : 
+                "text-blue-500"
+              )} />
+              <span className="text-sm text-gray-500">AI is thinking...</span>
+              </div>
+          )}
             </div>
           </div>
+    );
+  }
+
+  function renderResearchTab() {
+    return (
+      <div className="flex-1 flex flex-col">
+        <div className={cn(
+          "p-4 border-b",
+          isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
+          isSpiralStyle ? "border-[#e6b44c] bg-white" : 
+          "border-gray-200 bg-white"
+        )}>
+          <h2 className={cn(
+            "text-lg font-medium mb-2",
+            isOfficeStyle ? "text-[#0078d4]" : 
+            isSpiralStyle ? "text-[#004080]" : 
+            ""
+          )}>Research Assistant</h2>
+          <p className="text-sm text-gray-600">
+            I can analyze your conversation and provide research insights and suggestions.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {isAnalyzing ? (
+            <div className="flex items-center justify-center py-6 text-gray-500">
+              <Loader2 className={cn(
+                "h-5 w-5 mr-2 animate-spin",
+                isOfficeStyle ? "text-[#0078d4]" : 
+                isSpiralStyle ? "text-[#004080]" : 
+                "text-blue-500"
+              )} />
+              <span>Analyzing conversation...</span>
+            </div>
+          ) : (
+            <ResearchAssistant 
+              messages={mainChatMessages}
+              onSuggestionClick={(suggestion) => {
+                // Set the input value in the sidebar chat
+                setInputValue(suggestion);
+                
+                // Send this suggestion to the main chat and auto-submit
+                if (onMainChatInteraction) {
+                  // Log for debugging
+                  console.log('Sending suggestion to main chat:', suggestion);
+                  
+                  // Make sure we're using the right action type - should be 'workflow'
+                  onMainChatInteraction('workflow', suggestion);
+                  
+                  // Show visual feedback that the suggestion was sent
+                  toast.success("Suggestion sent to main chat", {
+                    duration: 2000,
+                    position: 'bottom-right',
+                  });
+                } else {
+                  console.error('onMainChatInteraction is not defined');
+                  toast.error("Unable to send suggestion to main chat", {
+                    duration: 2000,
+                    position: 'bottom-right',
+                  });
+                }
+              }}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderAgentTab() {
+    return (
+      <div className="flex-1 flex flex-col">
+        <div className={cn(
+          "p-4 border-b",
+          isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
+          isSpiralStyle ? "border-[#e6b44c] bg-white" : 
+          "border-gray-200 bg-white"
+        )}>
+          <h2 className={cn(
+            "text-lg font-medium mb-2",
+            isOfficeStyle ? "text-[#0078d4]" : 
+            isSpiralStyle ? "text-[#004080]" : 
+            ""
+          )}>AI Assistant</h2>
+          <p className="text-sm text-gray-600">
+            I can suggest tasks and analyze your documents to help you work more efficiently.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Existing agent tab content would go here */}
+          <div>Agent content</div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderHistoryTab() {
+    return (
+      <div className="p-4 space-y-4">
+        {/* History content goes here */}
+        <div className={cn(
+          "text-center p-6 rounded-lg border",
+          isOfficeStyle ? "bg-[#f3f2f1] border-[#e1dfdd]" : 
+          isSpiralStyle ? "bg-[#f5f1e5] border-[#e6b44c]" : 
+          "bg-gray-50 border-gray-200"
+        )}>
+          <p className="text-gray-500 text-sm">Chat history will be displayed here</p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderDocumentsTab() {
+    return (
+      <div className="p-4 space-y-4">
+        {/* Document Upload */}
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            multiple
+            onChange={(e) => e.target.files && handleDocumentAttachment(e.target.files)}
+            className="hidden"
+            id="document-upload"
+            accept=".txt,.json,.md,.js,.ts,.py,.html,.css"
+          />
+          <label 
+            htmlFor="document-upload" 
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer",
+              isOfficeStyle ? "bg-[#0078d4] text-white hover:bg-[#106ebe]" : 
+              isSpiralStyle ? "bg-[#004080] text-white hover:bg-[#01305f] border border-[#e6b44c]" : 
+              "bg-blue-500 text-white hover:bg-blue-600"
+            )}
+          >
+            <Upload className="h-4 w-4" />
+            <span>Upload Documents</span>
+          </label>
+        </div>
+        
+        {/* Document List */}
+        {attachedDocuments.length > 0 ? (
+          <div className="space-y-3">
+            <h3 className={cn(
+              "text-sm font-medium",
+              isOfficeStyle ? "text-[#0078d4]" : 
+              isSpiralStyle ? "text-[#004080]" : 
+              ""
+            )}>
+              Attached Documents
+            </h3>
+            <div className="space-y-2">
+              {attachedDocuments.map(doc => (
+                <div 
+                  key={doc.id} 
+                  className={cn(
+                    "p-3 rounded-md border",
+                    isOfficeStyle ? "border-[#e1dfdd] hover:border-[#0078d4] hover:bg-[#f3f2f1]" : 
+                    isSpiralStyle ? "border-[#e6b44c] hover:border-[#e6b44c] hover:bg-[#f5f1e5]" : 
+                    "border-gray-200 hover:border-blue-500 hover:bg-gray-50"
+                  )}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center">
+                      <FileText className={cn(
+                        "h-4 w-4 mr-2",
+                        isOfficeStyle ? "text-[#0078d4]" : 
+                        isSpiralStyle ? "text-[#004080]" : 
+                        "text-blue-500"
+                      )} />
+                      <span className="font-medium">{doc.name}</span>
+                  </div>
+                  </div>
+                      </div>
+              ))}
+                        </div>
+                    </div>
+        ) : (
+          <div className={cn(
+            "text-center p-6 rounded-lg border",
+            isOfficeStyle ? "bg-[#f3f2f1] border-[#e1dfdd]" : 
+            isSpiralStyle ? "bg-[#f5f1e5] border-[#e6b44c]" : 
+            "bg-gray-50 border-gray-200"
+          )}>
+            <p className="text-gray-500 text-sm">No documents attached</p>
           </div>
         )}
       </div>
   );
-}
-
-function TabButton({ icon, label, isActive, onClick, color }: { 
-  icon: React.ReactNode; 
-  label: string; 
-  isActive: boolean; 
-  onClick: () => void;
-  color: { bg: string; text: string };
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-2 px-4 py-3",
-        "text-sm font-medium transition-colors relative",
-        isActive 
-          ? `text-[${color.text}]` 
-          : "text-[#5f6368] hover:text-[#202124]",
-        "after:absolute after:bottom-0 after:left-0 after:right-0",
-        "after:h-[3px] after:transition-all after:duration-200",
-        isActive && `after:bg-[${color.text}]`
-      )}
-    >
-      {icon}
-      {label}
-    </button>
-  );
+  }
 } 

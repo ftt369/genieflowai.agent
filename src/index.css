@@ -20,3 +20,149 @@ body {
     margin-bottom: 1em;
   }
 }
+
+/* Default theme variables */
+html[data-theme="default"] {
+  --background: white;
+  --foreground: #1a2234;
+  --card: white;
+  --card-foreground: #1a2234;
+  --popover: white;
+  --popover-foreground: #1a2234;
+  --primary: #4285f4;
+  --primary-foreground: white;
+  --secondary: #34a853;
+  --secondary-foreground: white;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #ea4335;
+  --accent-foreground: white;
+  --destructive: #ef4444;
+  --destructive-foreground: white;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #4285f4;
+  --radius: 0.5rem;
+}
+
+/* Dark mode overrides for default theme */
+html[data-theme="default"].dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #4285f4;
+  --primary-foreground: white;
+  --secondary: #34a853;
+  --secondary-foreground: white;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #ea4335;
+  --accent-foreground: white;
+  --destructive: #ef4444;
+  --destructive-foreground: white;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #4285f4;
+}
+
+/* Spiral theme styles */
+html[data-theme="spiral"] {
+  --background: white;
+  --foreground: #1f2937;
+  --card: white;
+  --card-foreground: #1f2937;
+  --popover: white;
+  --popover-foreground: #1f2937;
+  --primary: #004080;
+  --primary-foreground: white;
+  --secondary: #53c5eb;
+  --secondary-foreground: white;
+  --muted: #f5f1e5;
+  --muted-foreground: #666;
+  --accent: #e6b44c;
+  --accent-foreground: white;
+  --destructive: #ef4444;
+  --destructive-foreground: white;
+  --border: #e6b44c;
+  --input: #e6b44c;
+  --ring: #e6b44c;
+  --radius: 0.5rem;
+}
+
+/* Dark mode overrides for Spiral theme */
+html[data-theme="spiral"].dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --popover: #1e293b;
+  --popover-foreground: #f8fafc;
+  --primary: #e6b44c;
+  --primary-foreground: #1e293b;
+  --secondary: #53c5eb;
+  --secondary-foreground: #1e293b;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #004080;
+  --accent-foreground: white;
+  --destructive: #ef4444;
+  --destructive-foreground: white;
+  --border: #e6b44c;
+  --input: #334155;
+  --ring: #e6b44c;
+}
+
+/* Custom scrollbar for Spiral theme */
+.scrollbar-thin-spiral::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin-spiral::-webkit-scrollbar-track {
+  background: #f5f1e5;
+}
+
+.scrollbar-thin-spiral::-webkit-scrollbar-thumb {
+  background-color: #e6b44c;
+  border-radius: 6px;
+}
+
+.scrollbar-thin-spiral::-webkit-scrollbar-thumb:hover {
+  background: #d6a43c;
+}
+
+/* Add chat avatar/icon sizing rules */
+.message-avatar,
+.chat-message-icon,
+.message-icon {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure icons inside messages are properly sized */
+.chat-message img,
+.message-content img,
+.chat-bubble img {
+  max-width: 24px;
+  max-height: 24px;
+}
+
+/* For any avatar image that might be applied directly */
+img.avatar,
+.avatar img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}

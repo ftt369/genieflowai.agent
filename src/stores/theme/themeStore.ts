@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type ColorProfile = 'default' | 'vibrant' | 'muted' | 'contrast';
+export type ColorProfile = 'default' | 'spiral';
 
 export interface ThemeState {
   mode: 'light' | 'dark' | 'system';

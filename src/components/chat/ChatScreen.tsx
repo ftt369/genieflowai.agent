@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, useRef, FormEvent, ChangeEvent, Dispatch, SetStateAction, useCallback } from 'react';
 import { useModelStore } from '@/stores/model/modelStore';
 import { useModeStore } from '@/stores/model/modeStore';
 import { useThemeStore } from '@/stores/theme/themeStore';
@@ -27,7 +27,25 @@ import {
   Trash2,
   Copy,
   Check,
-  Sparkles
+  Sparkles,
+  Settings,
+  HelpCircle,
+  Command,
+  Keyboard,
+  Clock,
+  Search as SearchIcon,
+  Star,
+  StarOff,
+  Share,
+  MessageSquare,
+  Flag,
+  Link,
+  ChevronDown,
+  ChevronUp,
+  User2,
+  Plus,
+  AlertTriangle,
+  Square
 } from 'lucide-react';
 import type { ChatMessage as BaseChatMessage } from '@/types/chat';
 import { extractFileContent, createImageThumbnail, cleanupOCR } from '../../utils/fileUtils';
@@ -37,6 +55,14 @@ import FileDropZone from './FileDropZone';
 import { generateUUID } from '@/utils/uuid';
 import { useDocumentStore } from '@/stores/documentStore';
 import { processFile } from '@/utils/fileUtils';
+import { useMemoryStore } from '@/stores/memory/memoryStore';
+import { lazy } from 'react';
+import ChatHeader from './ChatHeader';
+import PromptTemplates from './PromptTemplates';
+import Prism from 'prismjs';
+import CodeBlock from './CodeBlock';
+import { useAiAssistant } from '@/services/aiAssistantService';
+import { Toaster } from 'react-hot-toast';
 
 // Extend the base ChatMessage type with additional properties
 interface ExtendedChatMessage extends Omit<BaseChatMessage, 'role'> {
@@ -103,6 +129,39 @@ const EXPORT_FORMATS: ExportFormat[] = [
   { type: 'txt', icon: File, label: 'Text', mimeType: 'text/plain' },
   { type: 'markdown', icon: File, label: 'Markdown', mimeType: 'text/markdown' },
   { type: 'html', icon: File, label: 'HTML', mimeType: 'text/html' }
+];
+
+const PROMPT_TEMPLATES = [
+  {
+    id: 'explain-code',
+    name: 'Explain Code',
+    prompt: 'Explain the following code in detail, covering what it does, its architecture, and potential issues:\n\n```{{language}}\n{{code}}\n```',
+    variables: ['language', 'code']
+  },
+  {
+    id: 'debug-code',
+    name: 'Debug Code',
+    prompt: 'Debug the following code. Identify issues, explain why they occur, and suggest fixes:\n\n```{{language}}\n{{code}}\n```',
+    variables: ['language', 'code']
+  },
+  {
+    id: 'improve-code',
+    name: 'Improve Code',
+    prompt: 'Improve the following code. Consider performance, readability, and best practices:\n\n```{{language}}\n{{code}}\n```',
+    variables: ['language', 'code']
+  },
+  {
+    id: 'research-topic',
+    name: 'Research Topic',
+    prompt: 'Provide a comprehensive analysis of {{topic}}. Cover key concepts, recent developments, applications, and future directions.',
+    variables: ['topic']
+  },
+  {
+    id: 'compare-contrast',
+    name: 'Compare & Contrast',
+    prompt: 'Compare and contrast {{item1}} and {{item2}}. Cover similarities, differences, advantages, disadvantages, and use cases.',
+    variables: ['item1', 'item2']
+  }
 ];
 
 const ALLOWED_FILE_TYPES = {
@@ -303,6 +362,19 @@ const formatResponse = (content: string, format: string): string => {
     .replace(/^I cannot.+?\n/gi, '')
     .trim();
     
+  // Advanced code block formatting with language detection
+  cleanedContent = cleanedContent.replace(/```(\w*)\n([\s\S]*?)```/g, (match, language, code) => {
+    // If no language specified, try to detect it
+    const lang = language || detectCodeLanguage(code);
+    return `<div class="code-block-wrapper my-4 rounded-lg overflow-hidden">
+      <div class="code-header flex items-center justify-between bg-slate-700 text-white px-4 py-2">
+        <span class="text-xs font-mono">${lang || 'code'}</span>
+        <button class="copy-code-btn text-xs bg-slate-600 px-2 py-1 rounded hover:bg-slate-500" data-code="${encodeURIComponent(code.trim())}">Copy</button>
+      </div>
+      <pre class="bg-slate-800 p-4 overflow-x-auto"><code class="language-${lang || 'text'}">${code}</code></pre>
+    </div>`;
+  });
+    
   // Format headers to be larger and bolder
   let formattedContent = cleanedContent
     // Format markdown headers with HTML for better display
@@ -320,16 +392,21 @@ const formatResponse = (content: string, format: string): string => {
     .replace(/^[*-]\s+(.*?)$/gm, '<div class="flex gap-2 my-1"><span class="font-medium">•</span><span>$1</span></div>')
     
     // Format bold text
-    .replace(/\*\*(.*?)\*\*/g, '<span class="font-bold">$1</span>')
+    .replace(/\*\*(.*?)\*\*/g, '<span class="font-bold text-blue-600 dark:text-blue-400">$1</span>')
     
     // Format italic text
     .replace(/\*(.*?)\*/g, '<span class="italic">$1</span>')
     
-    // Format code blocks (preserve them but with styling)
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-slate-100 dark:bg-slate-800 p-3 rounded-md overflow-x-auto my-2"><code>$2</code></pre>')
-    
     // Format inline code
-    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-sm">$1</code>')
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
+    
+    // Format tables with better styling
+    .replace(
+      /\|(.+)\|\n\|(:?-+:?\|)+\n((\|.+\|\n)+)/g,
+      '<div class="overflow-x-auto my-4"><table class="w-full border-collapse"><thead><tr>$1</tr></thead><tbody>$3</tbody></table></div>'
+    )
+    .replace(/\|(.+?)\|/g, '<td class="border border-slate-300 dark:border-slate-700 px-4 py-2">$1</td>')
+    .replace(/<tr>(.+?)<\/tr>/g, '<tr>$1</tr>')
     
     // Format paragraphs
     .replace(/\n\n/g, '</p><p class="my-2">');
@@ -348,6 +425,90 @@ const formatStreamingContent = (content: string): string => {
   return formatResponse(content, 'natural');
 };
 
+// Add this function after formatResponse
+const detectCodeLanguage = (code: string): string => {
+  // Simple language detection based on keywords and syntax
+  if (/\b(function|const|let|var|return|import|export|class)\b/.test(code) && /[{}]/.test(code)) {
+    if (/\b(React|useState|useEffect|jsx|tsx|component)\b/.test(code)) {
+      return 'jsx';
+    }
+    if (/\bimport\s+.*\s+from\s+/.test(code)) {
+      return 'typescript';
+    }
+    return 'javascript';
+  }
+  if (/\b(def|class|import|from|if __name__ == ['"]__main__['"])\b/.test(code)) {
+    return 'python';
+  }
+  if (/\b(public static void main|public class|private|protected|extends|implements)\b/.test(code)) {
+    return 'java';
+  }
+  if (/\b(func|struct|interface|package|import|go)\b/.test(code)) {
+    return 'go';
+  }
+  if (/\b(use strict|my|package|sub)\b/.test(code)) {
+    return 'perl';
+  }
+  if (/\b(namespace|using|public|private|class|void)\b/.test(code) && /[{}]/.test(code)) {
+    return 'csharp';
+  }
+  if (/<\w+>|<\/\w+>|<\w+\s+.*\/>/.test(code)) {
+    return 'markup';
+  }
+  if (/\b(select|from|where|insert|update|delete|create table)\b/i.test(code)) {
+    return 'sql';
+  }
+  
+  return '';
+};
+
+// Add this type definition after the imports
+// Define NotificationType
+type NotificationType = 'success' | 'error' | 'info';
+
+// Lazy load the settings component to improve initial load time
+const AiSettings = lazy(() => import('../settings/AiSettings'));
+
+// Determine if running on macOS
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+
+// At the top of the file, add this custom keyboard shortcuts component definition
+const KeyboardShortcuts: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+  // Simple implementation for now
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full">
+        <h2 className="text-xl font-bold mb-4">Keyboard Shortcuts</h2>
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <span>Send message</span>
+            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Enter</kbd>
+          </div>
+          <div className="flex justify-between">
+            <span>New line</span>
+            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Shift+Enter</kbd>
+          </div>
+          <div className="flex justify-between">
+            <span>Search</span>
+            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+          </div>
+        </div>
+        <button 
+          onClick={onClose}
+          className="mt-4 w-full bg-primary text-white py-2 rounded"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function ChatScreen({ 
   onMessagesChange, 
   isLeftSidebarCollapsed,
@@ -360,6 +521,10 @@ export default function ChatScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
+  
+  // Chat title editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
   
   // Store hooks
   const { modelService } = useModelStore();
@@ -379,7 +544,8 @@ export default function ChatScreen({
     pinChat,
     unpinChat,
     deleteChat,
-    updateChatTitle
+    updateChatTitle,
+    removeMessage
   } = useChatStore();
 
   const currentChat = activeChat ? getChat(activeChat) : null;
@@ -428,6 +594,8 @@ export default function ChatScreen({
     }
   }, [onSidebarInteraction, activeChat]);
 
+  const aiAssistant = useAiAssistant();
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isLoading || (!input.trim() && attachments.length === 0) || !activeChat) return;
@@ -435,6 +603,9 @@ export default function ChatScreen({
     setIsLoading(true);
 
     try {
+      // Store the current query for knowledge base search
+      const currentQuery = input.trim();
+
       // Prepare the message content including file contents
       let messageContent = input.trim();
       
@@ -457,27 +628,58 @@ export default function ChatScreen({
       addMessage(activeChat, userMessage);
       setInput('');
       setAttachments([]);
-
-      // Get AI response using the existing modelService
-      const response = await modelService.generateChatStream([
-        { role: 'user', content: messageContent }
-      ]);
       
-      let fullResponse = '';
-      for await (const chunk of response) {
-        fullResponse += chunk;
+      // Include contextual memory in the conversation
+      const messagesToSend: {role: 'user' | 'assistant' | 'system', content: string}[] = [];
+      
+      if (memoryEnabled && contextualMemory.length > 0) {
+        messagesToSend.push({
+          role: 'system',
+          content: `For context, here are key points from your recent conversation: ${contextualMemory.join(' | ')}. Remember these points as you respond to the user's current message.`
+        });
       }
+      
+      messagesToSend.push({ role: 'user', content: messageContent });
 
-      // Add AI response to chat
+      // Create an initial empty assistant message
+      const assistantMessageId = generateUUID();
       const assistantMessage: ChatMessage = {
-        id: generateUUID(),
+        id: assistantMessageId,
         role: 'assistant',
-        content: fullResponse,
+        content: '',
         timestamp: new Date(),
       };
-
-      // Add assistant message
+      
+      // Add the empty assistant message to start
       addMessage(activeChat, assistantMessage);
+      
+      // Use streaming response
+      const responseStream = aiAssistant.generateResponseStream(messagesToSend, currentQuery);
+      let accumulatedContent = '';
+      
+      for await (const chunk of responseStream) {
+        accumulatedContent += chunk;
+        
+        // Update the message in the store with the accumulated content
+        const updatedMessage = {
+          ...assistantMessage,
+          content: accumulatedContent
+        };
+        
+        // Remove and re-add the message to update it
+        removeMessage(activeChat, assistantMessageId);
+        addMessage(activeChat, updatedMessage);
+        
+        // Format the content with code highlighting for display
+        const formattedContent = highlightCode(accumulatedContent);
+        
+        // Update the formatted content in the UI directly
+        const messageElement = document.getElementById(`message-content-${assistantMessageId}`);
+        if (messageElement) {
+          messageElement.innerHTML = formattedContent;
+        }
+      }
+      
     } catch (error: any) {
       console.error('Error in chat:', error);
       setNotifications(prev => [...prev, {
@@ -491,17 +693,38 @@ export default function ChatScreen({
     }
   };
 
+  // Function to update message content (using existing chat functions)
+  const updateMessageContent = (chatId: string, messageId: string, content: string) => {
+    // Get the current chat
+    const { chats } = useChatStore.getState();
+    const chat = chats.find(c => c.id === chatId);
+    
+    if (chat) {
+      // Find the message to update
+      const message = chat.messages.find(m => m.id === messageId);
+      if (message) {
+        // Create an updated message with the new content
+        const updatedMessage: ChatMessage = {
+          ...message,
+          content
+        };
+        
+        // Remove the old message and add the updated one
+        removeMessage(chatId, messageId);
+        addMessage(chatId, updatedMessage);
+      }
+    }
+  };
+
   // UI State
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showWorkflowCreate, setShowWorkflowCreate] = useState(false);
   const [workflowName, setWorkflowName] = useState('');
   const [notifications, setNotifications] = useState<Array<{
     id: string;
-    type: 'success' | 'error' | 'info' | 'loading';
+    type: NotificationType;
     title: string;
     message?: string;
   }>>([]);
@@ -593,6 +816,7 @@ export default function ChatScreen({
     deleteChat(chatId);
   };
 
+  // Update chat title
   const handleUpdateTitle = () => {
     if (activeChat && editingTitle.trim()) {
       updateChatTitle(activeChat, editingTitle.trim());
@@ -600,9 +824,11 @@ export default function ChatScreen({
     }
   };
 
-  const handleClearAllChats = () => {
-    // This function is no longer used in the new implementation
-  };
+  useEffect(() => {
+    if (currentChat?.title) {
+      setEditingTitle(currentChat.title);
+    }
+  }, [currentChat?.title]);
 
   // Enhanced file handling function
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -923,7 +1149,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
     // Show loading notification
     setNotifications(prev => [...prev, {
       id: notificationId,
-      type: 'loading',
+      type: 'info',
       title: 'Processing files',
       message: `Processing ${files.length} file(s)...`
     }]);
@@ -1018,9 +1244,9 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
       console.log('Processing file:', file.name);
 
       // Add user message about the file upload
-      const userMessage = {
+    const userMessage = {
         id: generateUUID(),
-        role: 'user' as const,
+      role: 'user' as const,
         content: `I'm uploading ${file.name} for analysis.`,
         timestamp: new Date()
       };
@@ -1029,7 +1255,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
       // Add initial processing message
       const processingMessage = {
         id: generateUUID(),
-        role: 'assistant' as const,
+          role: 'assistant' as const,
         content: `Processing "${file.name}"... This may take a moment.`,
         timestamp: new Date()
       };
@@ -1045,7 +1271,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
         // Add success message
         const successMessage = {
           id: generateUUID(),
-          role: 'assistant' as const,
+            role: 'assistant' as const,
           content: `I've processed "${file.name}" (${(file.size / 1024 / 1024).toFixed(2)} MB) and stored its contents. You can now ask me questions about this document.`,
           timestamp: new Date()
         };
@@ -1059,7 +1285,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
           timestamp: new Date()
         };
         addMessage(activeChat, promptMessage);
-      } else {
+        } else {
         // Add error message if processing failed
         const errorMessage = {
           id: generateUUID(),
@@ -1087,26 +1313,766 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
     }
   };
 
-  return (
-    <div 
-      className="flex flex-col h-full w-full relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* Drag overlay */}
-      {isDragging && (
-        <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-background p-8 rounded-xl shadow-lg border-2 border-dashed border-primary flex flex-col items-center">
-            <Paperclip className="h-12 w-12 text-primary mb-4" />
-            <p className="text-lg font-medium">Drop files to attach</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Supported formats: PDF, Word, Excel, images, and more
-            </p>
-          </div>
-        </div>
-      )}
+  // Inside the ChatScreen component, add near the other state variables
+  const [promptTemplate, setPromptTemplate] = useState<typeof PROMPT_TEMPLATES[0] | null>(null);
+  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
+  const [showPromptTemplates, setShowPromptTemplates] = useState(false);
+  const [contextualMemory, setContextualMemory] = useState<string[]>([]);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const memoryStore = useMemoryStore();
 
+  // Add useEffect for contextual memory
+  useEffect(() => {
+    // Maintain a rolling context window of important chat snippets
+    if (memoryEnabled && chatMessages.length > 0) {
+      // Extract key information from the last 10 messages
+      const relevantMessages = chatMessages.slice(-10).map(msg => {
+        if (msg.role === 'assistant') {
+          // Extract headings and key points
+          const headings = msg.content.match(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/g) || [];
+          const keyPoints = headings.map(h => h.replace(/<\/?[^>]+(>|$)/g, ''));
+          return keyPoints.length ? keyPoints.join('; ') : msg.content.substring(0, 200);
+        }
+        return msg.content.substring(0, 100);
+      });
+      
+      setContextualMemory(relevantMessages);
+      
+      // Update memory store with context from this conversation
+      memoryStore.updateMemory(activeChat || 'default', relevantMessages);
+    }
+  }, [chatMessages, memoryEnabled, activeChat]);
+
+  // Add keyboard shortcuts
+  const useCustomHotkeys = (key: string, callback: (event: KeyboardEvent) => void, options: any = {}) => {
+    useEffect(() => {
+      const handler = (event: KeyboardEvent) => {
+        // Parse the key combination (mod+/ = Ctrl/Cmd + /)
+        const isMod = event.ctrlKey || event.metaKey;
+        const isShift = event.shiftKey;
+        
+        // Handle mod+/ (Ctrl/Cmd + /)
+        if (key === 'mod+/' && isMod && event.key === '/' && !isShift) {
+          callback(event);
+        }
+        // Handle mod+enter (Ctrl/Cmd + Enter)
+        else if (key === 'mod+enter' && isMod && event.key === 'Enter' && !isShift) {
+          callback(event);
+        }
+        // Handle mod+shift+v (Ctrl/Cmd + Shift + V)
+        else if (key === 'mod+shift+v' && isMod && isShift && event.key === 'v') {
+          callback(event);
+        }
+      };
+
+      document.addEventListener('keydown', handler);
+      return () => document.removeEventListener('keydown', handler);
+    }, [key, callback]);
+  };
+
+  useCustomHotkeys('mod+/', () => {
+    setShowPromptTemplates(prev => !prev);
+  });
+
+  useCustomHotkeys('mod+enter', (event: KeyboardEvent) => {
+    event.preventDefault();
+    if (!isLoading && (input.trim() || attachments.length > 0)) {
+      handleSubmit(new Event('submit') as unknown as FormEvent);
+    }
+  });
+
+  useCustomHotkeys('mod+shift+v', () => {
+    navigator.clipboard.readText().then(text => {
+      setInput(prev => prev + text);
+    });
+  });
+
+  // Add useEffect to handle clipboard events for code copy buttons
+  useEffect(() => {
+    const handleCopyCode = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.classList.contains('copy-code-btn')) {
+        const codeBlock = target.closest('.code-block');
+        if (codeBlock) {
+          const codeElement = codeBlock.querySelector('code');
+          if (codeElement) {
+            const text = codeElement.textContent || '';
+            navigator.clipboard.writeText(text)
+              .then(() => {
+                const originalText = target.textContent;
+                target.textContent = 'Copied!';
+                setTimeout(() => {
+                  target.textContent = originalText;
+                }, 2000);
+              });
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('click', handleCopyCode);
+    return () => document.removeEventListener('click', handleCopyCode);
+  }, []);
+
+  // Handle prompt template selection
+  const handleSelectTemplate = (prompt: string) => {
+    setInput(prompt);
+  };
+
+  // Add state to track settings panel visibility
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Get theme profile from the store
+  const { profile } = useThemeStore();
+  
+  // Determine if using spiral style
+  const isSpiralStyle = profile === 'spiral';
+
+  // Add state for the keyboard shortcuts modal
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isMod = event.ctrlKey || event.metaKey;
+      
+      // Cmd/Ctrl + . - Show prompt templates
+      if (isMod && event.key === '.') {
+        event.preventDefault();
+        setShowPromptTemplates(true);
+      }
+      
+      // ... existing keyboard shortcuts ...
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showKeyboardShortcuts, showPromptTemplates]);
+
+  // Add these after other state variables
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<number[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(0);
+  const [starredMessages, setStarredMessages] = useState<string[]>([]);
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+
+  // Add this effect for code syntax highlighting
+  useEffect(() => {
+    // Load Prism.js languages
+    if (typeof window !== 'undefined') {
+      import('prismjs/components/prism-javascript');
+      import('prismjs/components/prism-typescript');
+      import('prismjs/components/prism-jsx');
+      import('prismjs/components/prism-tsx');
+      import('prismjs/components/prism-css');
+      import('prismjs/components/prism-python');
+      import('prismjs/components/prism-java');
+      import('prismjs/components/prism-c');
+      import('prismjs/components/prism-cpp');
+      import('prismjs/components/prism-csharp');
+      import('prismjs/components/prism-go');
+      import('prismjs/components/prism-bash');
+      import('prismjs/components/prism-sql');
+      import('prismjs/components/prism-markdown');
+      import('prismjs/components/prism-json');
+      import('prismjs/components/prism-yaml');
+      import('prismjs/components/prism-graphql');
+    }
+  }, []);
+
+  // Add this effect to highlight code blocks when messages change
+  useEffect(() => {
+    if (typeof Prism !== 'undefined') {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        Prism.highlightAll();
+      }, 100);
+    }
+  }, [chatMessages]);
+
+  // Add these functions for message actions
+  const toggleStarMessage = (messageId: string) => {
+    setStarredMessages(prev => 
+      prev.includes(messageId) 
+        ? prev.filter(id => id !== messageId)
+        : [...prev, messageId]
+    );
+  };
+
+  const copyMessageLink = (messageId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('message', messageId);
+    navigator.clipboard.writeText(url.toString());
+    setNotifications(prev => [...prev, {
+      id: generateUUID(),
+      type: 'success',
+      title: 'Link copied',
+      message: 'Message link copied to clipboard'
+    }]);
+  };
+
+  const toggleMessageExpansion = (messageId: string) => {
+    setExpandedMessageId(prev => prev === messageId ? null : messageId);
+  };
+
+  // Search functionality
+  const handleSearch = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    const results: number[] = [];
+    chatMessages.forEach((message, index) => {
+      if (message.content.toLowerCase().includes(searchQuery.toLowerCase())) {
+        results.push(index);
+      }
+    });
+    
+    setSearchResults(results);
+    if (results.length > 0) {
+      setCurrentSearchIndex(0);
+      const messageElement = document.getElementById(`message-${results[0]}`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth' });
+        messageElement.classList.add('search-highlight');
+        setTimeout(() => messageElement.classList.remove('search-highlight'), 1000);
+      }
+    }
+  }, [searchQuery, chatMessages]);
+  
+  // Navigate between search results
+  const navigateSearch = useCallback((direction: 'next' | 'prev') => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex = currentSearchIndex;
+    if (direction === 'next') {
+      newIndex = (currentSearchIndex + 1) % searchResults.length;
+        } else {
+      newIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+    }
+    
+    setCurrentSearchIndex(newIndex);
+    
+    const messageElement = document.getElementById(`message-${searchResults[newIndex]}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth' });
+      messageElement.classList.add('search-highlight');
+      setTimeout(() => messageElement.classList.remove('search-highlight'), 1000);
+    }
+  }, [searchResults, currentSearchIndex]);
+  
+  // Add search keyboard shortcuts
+  useEffect(() => {
+    const handleSearchShortcut = (e: KeyboardEvent) => {
+      // Ctrl+F or Cmd+F to toggle search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearchActive(prev => !prev);
+        if (!isSearchActive) {
+          setTimeout(() => {
+            const searchInput = document.querySelector('input[type="search"]');
+            if (searchInput) {
+              (searchInput as HTMLInputElement).focus();
+            }
+          }, 100);
+        }
+      }
+      
+      // When search is active
+      if (isSearchActive) {
+        // Escape to close search
+        if (e.key === 'Escape') {
+          setIsSearchActive(false);
+        }
+        
+        // Enter to search
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (e.ctrlKey || e.metaKey) {
+            navigateSearch('next');
+          } else {
+            handleSearch();
+          }
+        }
+        
+        // F3 to navigate results
+        if (e.key === 'F3') {
+          e.preventDefault();
+          navigateSearch(e.shiftKey ? 'prev' : 'next');
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
+  }, [isSearchActive, handleSearch, navigateSearch]);
+  
+  // Add CSS for search highlighting
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .search-highlight {
+        animation: highlight-pulse 1s ease-in-out;
+      }
+      
+      @keyframes highlight-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Add a simple code highlighting function
+  const highlightCode = (content: string): string => {
+    // Simple regex-based code block highlighting
+    return content.replace(
+      /```(\w*)\n([\s\S]*?)```/g, 
+      (match, language, code) => {
+        const lang = language || 'text';
+        return `<div class="code-block my-4 rounded-lg overflow-hidden">
+          <div class="code-header flex items-center justify-between bg-slate-700 text-white px-4 py-2">
+            <span class="text-xs font-mono">${lang}</span>
+            <button class="copy-code-btn text-xs bg-slate-600 px-2 py-1 rounded hover:bg-slate-500">Copy</button>
+          </div>
+          <pre class="bg-slate-800 p-4 overflow-x-auto text-gray-300"><code class="language-${lang}">${escapeHtml(code)}</code></pre>
+        </div>`;
+      }
+    );
+  };
+
+  // Helper function to escape HTML in code blocks
+  const escapeHtml = (unsafe: string): string => {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  // Function to render message content with code blocks extracted
+  const renderMessageContent = (content: string) => {
+    // Regex to match code blocks with optional language and filename
+    // Format: ```language:filename\ncode\n```
+    const codeBlockRegex = /```(([a-zA-Z0-9_-]+)(:([^\n]+))?)?\n([\s\S]*?)\n```/g;
+    
+    // Split the content by code blocks
+    const segments = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      // Add text before the code block
+      if (match.index > lastIndex) {
+        segments.push({
+          type: 'text',
+          content: content.substring(lastIndex, match.index)
+        });
+      }
+      
+      // Extract language and filename (if provided)
+      const language = match[2] || 'javascript';
+      const filename = match[4] || undefined;
+      const code = match[5];
+      
+      // Add the code block
+      segments.push({
+        type: 'code',
+        language,
+        filename,
+        content: code
+      });
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text after the last code block
+    if (lastIndex < content.length) {
+      segments.push({
+        type: 'text',
+        content: content.substring(lastIndex)
+      });
+    }
+    
+    // Function to convert markdown to HTML
+    const markdownToHtml = (text: string) => {
+      // Handle bold text
+      text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      
+      // Handle italic text
+      text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      
+      // Handle inline code
+      text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+      
+      // Handle links
+      text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-blue-500 hover:underline">$1</a>');
+      
+      // Handle bullet points
+      text = text.replace(/^- (.*?)$/gm, '<li>$1</li>');
+      text = text.replace(/<li>(.*?)<\/li>/g, '<ul class="list-disc ml-5 mb-2"><li>$1</li></ul>');
+      
+      // Handle numbered points
+      text = text.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
+      text = text.replace(/^<li>(.*?)<\/li>$/gm, '<ol class="list-decimal ml-5 mb-2"><li>$1</li></ol>');
+      
+      // Handle paragraphs
+      text = text.replace(/\n\n/g, '<br/><br/>');
+      
+      return text;
+    };
+    
+    // Render the segments
+    return (
+      <div className="message-content">
+        {segments.map((segment, index) => {
+          if (segment.type === 'code') {
+            return (
+              <CodeBlock 
+                key={index}
+                code={segment.content}
+                language={segment.language}
+                filename={segment.filename}
+              />
+            );
+          } else {
+            // For text segments, we need to process markdown
+            const htmlContent = markdownToHtml(segment.content);
+            return (
+              <div 
+                key={index} 
+                className="prose dark:prose-invert max-w-none mb-2 text-[15px] leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+              />
+            );
+          }
+        })}
+      </div>
+    );
+  };
+
+  // Make sure these variables are declared at the top
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Add a copy to clipboard function
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    // You could add notification logic here
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full overflow-hidden">
+      {/* Toast container for notifications */}
+      <Toaster position="bottom-right" />
+      
+      {/* Chat Header */}
+      <ChatHeader
+        onNewChat={createChat}
+        onClearChat={() => {
+          if (window.confirm('Are you sure you want to clear this chat?')) {
+            if (activeChat) {
+              deleteChat(activeChat);
+              createChat();
+            }
+          }
+        }}
+        onShowSettings={() => setShowSettings(true)}
+        chatTitle={currentChat?.title || 'New Chat'}
+        isEditing={isEditing}
+        editingTitle={editingTitle}
+        setEditingTitle={setEditingTitle}
+        setIsEditing={setIsEditing}
+        handleUpdateTitle={handleUpdateTitle}
+        isSaved={activeChat ? savedChats.includes(activeChat) : false}
+        isPinned={activeChat ? pinnedChats.includes(activeChat) : false}
+        onSaveChat={() => activeChat && saveChat(activeChat)}
+        onPinChat={() => activeChat && pinChat(activeChat)}
+        onShowExport={() => setShowExportMenu(true)}
+      />
+      
+      {/* Main Chat Area (Messages + Input) */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Search bar - only visible when search is active */}
+        {isSearchActive && (
+          <div className="flex items-center gap-2 p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <SearchIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <input
+              id="chat-search-input"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearch();
+                }
+              }}
+              placeholder="Search in conversation..."
+              className="flex-1 bg-transparent border-none focus:ring-0 text-sm"
+                autoFocus
+              />
+            {searchResults.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {currentSearchIndex + 1} of {searchResults.length}
+                </span>
+              <button
+                  onClick={() => navigateSearch('prev')}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  aria-label="Previous result"
+              >
+                  <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                  onClick={() => navigateSearch('next')}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  aria-label="Next result"
+                >
+                  <ChevronDown className="h-4 w-4" />
+              </button>
+        </div>
+            )}
+              <button
+              onClick={() => {
+                setIsSearchActive(false);
+                setSearchQuery('');
+                setSearchResults([]);
+              }}
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Close search"
+            >
+              <X className="h-4 w-4" />
+          </button>
+        </div>
+        )}
+        
+        {/* Chat messages container */}
+        <div className="flex-1 overflow-y-auto p-4" ref={messagesContainerRef}>
+          {chatMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+              <Bot className="h-12 w-12 mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+              <p className="max-w-sm text-sm">
+                Begin by typing a message or choose a prompt template.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {chatMessages.map((message, index) => (
+            <div
+              key={message.id}
+                  id={`message-${index}`}
+                  ref={index === chatMessages.length - 1 ? messagesEndRef : null}
+              className={cn(
+                    "py-3 px-4 flex gap-3 rounded-lg",
+                    message.role === "assistant" 
+                      ? "bg-muted/40 border border-muted-foreground/10" 
+                      : "border border-muted-foreground/10 bg-white dark:bg-gray-800",
+                    searchResults.includes(index) && "bg-yellow-100/20 dark:bg-yellow-900/20",
+                    "shadow-sm hover:shadow transition-all duration-200"
+                  )}
+                >
+                  <div className={cn(
+                    "flex-shrink-0 w-8 h-8 rounded-full overflow-hidden flex items-center justify-center",
+                    message.role === 'assistant' 
+                      ? 'bg-primary/10 text-primary-foreground' 
+                      : 'bg-muted text-muted-foreground'
+                  )}>
+                    {message.role === 'assistant' ? (
+                      <Bot className="w-5 h-5" />
+                    ) : (
+                      <User2 className="w-5 h-5" />
+                    )}
+                </div>
+                  
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm flex items-center">
+                        {message.role === 'assistant' ? (
+                          <>
+                            <span className="mr-1.5">Assistant</span>
+                            <span className="text-xs py-0.5 px-1.5 rounded-md bg-primary/10 text-primary-foreground">AI</span>
+                          </>
+                        ) : 'You'}
+                              </span>
+                      
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={() => copyToClipboard(message.content)}
+                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="Copy message"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                            </div>
+                            </div>
+                    
+                    <div className="text-gray-800 dark:text-gray-200">
+                      {renderMessageContent(message.content)}
+                          </div>
+                  </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+        {/* Chat input */}
+        <div className="border-t p-2 bg-background">
+          <form onSubmit={handleSubmit} className="relative chat-form">
+            {isDragging && (
+              <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+                <div className="bg-background p-8 rounded-xl shadow-lg border-2 border-dashed border-primary flex flex-col items-center">
+                  <Paperclip className="h-12 w-12 text-primary mb-4" />
+                  <p className="text-lg font-medium">Drop files to attach</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Supported formats: PDF, Word, Excel, images, and more
+                  </p>
+              </div>
+            </div>
+          )}
+
+            {/* Attachment previews */}
+        {attachments.length > 0 && (
+              <div className="mb-2 p-2 flex flex-wrap gap-2 border rounded-lg">
+                {attachments.map(attachment => (
+                  <AttachmentPreview
+                  key={attachment.id}
+                    attachment={attachment}
+                    onRemove={() => removeAttachment(attachment.id)}
+                  />
+                ))}
+          </div>
+        )}
+
+            <div 
+              className="flex items-end border rounded-lg bg-background overflow-hidden focus-within:ring-2 focus-within:ring-primary/50 chat-input"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {/* Textarea for input */}
+              <div className="relative flex-1">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Submit on Enter (not Shift+Enter)
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (input.trim() || attachments.length > 0) {
+                        handleSubmit(e as unknown as React.FormEvent);
+                      }
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="w-full py-3 px-4 resize-none bg-transparent border-0 focus:ring-0 max-h-32 chat-textarea"
+                  rows={1}
+                  style={{ minHeight: '56px' }}
+                />
+              </div>
+              
+              {/* Action buttons */}
+              <div className="flex items-center p-2 gap-1.5">
+                {/* Attach file button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  title="Attach files"
+                >
+                  <Paperclip className="h-5 w-5" />
+              <input
+                type="file"
+                ref={fileInputRef}
+                    onChange={handleFileChange}
+                className="hidden"
+                multiple
+                  />
+              </button>
+
+                {/* Voice input button */}
+              <button
+                type="button"
+                onClick={toggleVoiceRecording}
+                className={cn(
+                    "p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800",
+                    voiceState.isRecording ? "text-red-500" : "text-gray-500 dark:text-gray-400"
+                )}
+                  title={voiceState.isRecording ? "Stop recording" : "Voice input"}
+              >
+                {voiceState.isRecording ? (
+                    <Square className="h-5 w-5" />
+                ) : (
+                    <Mic className="h-5 w-5" />
+                )}
+              </button>
+
+                {/* Prompt templates button */}
+                <button
+                  type="button"
+                  onClick={() => setShowPromptTemplates(true)}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  title="Prompt templates"
+                >
+                  <Sparkles className="h-5 w-5" />
+                </button>
+
+                {/* Send button */}
+              <button
+                type="submit"
+                disabled={isLoading || (!input.trim() && attachments.length === 0)}
+                className={cn(
+                    "ml-1 p-2 rounded-full bg-primary text-white",
+                    (isLoading || (!input.trim() && attachments.length === 0)) && "opacity-50 cursor-not-allowed"
+                )}
+                  title="Send message"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showPromptTemplates && (
+        <PromptTemplates
+          isOpen={showPromptTemplates}
+          onClose={() => setShowPromptTemplates(false)}
+          onSelectTemplate={(template) => {
+            setInput(template);
+            setShowPromptTemplates(false);
+          }}
+        />
+      )}
+      
+      {showSettings && (
+        <AiSettings
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+      
+      {showKeyboardShortcuts && (
+        <KeyboardShortcuts
+          isOpen={showKeyboardShortcuts}
+          onClose={() => setShowKeyboardShortcuts(false)}
+        />
+      )}
+      
       {/* Notifications */}
       <NotificationContainer>
         {notifications.map(notification => (
@@ -1120,326 +2086,19 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
         ))}
       </NotificationContainer>
 
-      {/* Messages Area - Scrollable */}
-      <div 
-        className="flex-1 overflow-y-auto min-h-0 w-full"
-        style={{
-          backgroundColor: 'eggshell',
-          overscrollBehavior: 'contain',
-          WebkitOverflowScrolling: 'touch'
-        }}
-      >
-        <div className="h-full w-full px-4 py-6">
-          {chatMessages.length === 0 && !isStreaming && (
-            <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">
-              <div className="text-center">
-                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Start a conversation with the assistant...</p>
-              </div>
-            </div>
-          )}
-          
-          {/* Message List */}
-          <div className="w-full max-w-[95%] mx-auto space-y-6">
-            {chatMessages.map((message: ChatMessage) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-4 p-6 rounded-2xl transition-all duration-300 ease-in-out",
-                "border",
-                message.role === 'assistant' 
-                    ? "bg-slate-200 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700" 
-                    : "bg-slate-300 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700",
-                "hover:-translate-y-0.5 transform-gpu",
-                "shadow-[0_10px_40px_rgb(0,0,0,0.12)] dark:shadow-[0_10px_40px_rgb(0,0,0,0.3)]",
-                "hover:shadow-[0_15px_50px_rgb(0,0,0,0.2)] dark:hover:shadow-[0_15px_50px_rgb(0,0,0,0.4)]"
-              )}
-              style={{
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                transform: 'translate3d(0, 0, 0)'
-              }}
-            >
-              {message.role === 'assistant' && (
-                  <div className="relative shrink-0">
-                    <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
-                    <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
-                      <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                </div>
-                </div>
-                )}
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {message.role === 'assistant' ? (
-                        <>
-                          <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                            {currentMode?.name || 'Assistant'}
-                              </span>
-                          <div className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
-                        </>
-                      ) : (
-                        <span className="text-slate-600 dark:text-slate-300 font-semibold">You</span>
-                      )}
-                    </span>
-                    {message.role === 'assistant' && (
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleCopy(message.content, message.id)}
-                          className={cn(
-                            "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-all duration-200",
-                            "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100",
-                            "bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700",
-                            "border border-slate-200 dark:border-slate-600",
-                            "shadow-sm hover:shadow-md transform-gpu hover:-translate-y-0.5"
-                          )}
-                          title="Copy message"
-                        >
-                          {copiedMessageId === message.id ? (
-                            <>
-                              <Check className="h-3.5 w-3.5 text-green-500" />
-                              <span className="text-green-500 font-medium">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3.5 w-3.5" />
-                              <span className="font-medium">Copy</span>
-                            </>
-                          )}
-                        </button>
-                            </div>
-                    )}
-                            </div>
-                  <div className={cn(
-                    "prose prose-lg max-w-none",
-                    "text-slate-800 dark:text-slate-200",
-                    "prose-headings:font-bold prose-headings:border-b prose-headings:border-slate-200 dark:prose-headings:border-slate-700 prose-headings:pb-2 prose-headings:mb-6",
-                    "prose-h1:text-2xl prose-h1:text-blue-700 dark:prose-h1:text-blue-400",
-                    "prose-h2:text-xl prose-h2:text-blue-600 dark:prose-h2:text-blue-500",
-                    "prose-h3:text-lg prose-h3:text-blue-500 dark:prose-h3:text-blue-600",
-                    "prose-p:mb-4 prose-p:leading-relaxed",
-                    "prose-pre:bg-slate-100/80 dark:prose-pre:bg-slate-800/80",
-                    "prose-pre:shadow-inner prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:p-4 prose-pre:rounded-lg",
-                    "prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4 prose-li:mb-2",
-                    "prose-ul:pl-5 prose-ol:pl-5 prose-ul:my-4 prose-ol:my-4",
-                    "prose-table:border-collapse prose-table:w-full prose-table:my-6",
-                    "prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:p-2 prose-th:border prose-th:border-slate-300 dark:prose-th:border-slate-700 prose-th:text-left",
-                    "prose-td:p-2 prose-td:border prose-td:border-slate-200 dark:prose-td:border-slate-700",
-                    "prose-strong:font-bold prose-strong:text-blue-700 dark:prose-strong:text-blue-400",
-                    "prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-sm",
-                    "font-semibold"
-                  )}>
-                    {message.role === 'assistant' ? (
-                      <div dangerouslySetInnerHTML={{ __html: message.content }} />
-                    ) : (
-                      message.content.split('\n\n').map((paragraph, index) => (
-                        <p key={index} className="mb-4">{paragraph}</p>
-                      ))
-                    )}
-                  </div>
-                {message.attachments && message.attachments.length > 0 && (
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {message.attachments.map((attachment: Attachment) => (
-                      <div key={attachment.id} className="w-full">
-                        <AttachmentPreview 
-                          attachment={attachment}
-                          showControls={true}
-                          className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-            
-          {isStreaming && (
-            <div className={cn(
-                "flex gap-4 p-5 rounded-2xl transition-all duration-300 ease-in-out",
-                "border",
-                "bg-white/95 dark:bg-slate-800/95 border-slate-200 dark:border-slate-700",
-                "shadow-[0_10px_40px_rgb(0,0,0,0.12)] dark:shadow-[0_10px_40px_rgb(0,0,0,0.3)]",
-                "animate-in fade-in-0 slide-in-from-bottom-4"
-              )}
-              style={{
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                transform: 'translate3d(0, 0, 0)'
-              }}>
-                <div className="relative shrink-0">
-                  <div className="absolute -left-1 -top-1 w-8 h-8 bg-gradient-to-br from-blue-200/40 to-slate-200/30 rounded-full blur-md" />
-                  <div className="relative bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-600 shadow-md">
-                    <Bot className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                </div>
-                </div>
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                  {currentMode?.name || 'Assistant'}
-                    </span>
-                    <div className="h-1.5 w-1.5 rounded-full bg-blue-400/50 animate-pulse" />
-                </div>
-                  <div 
-                    className="prose prose-sm max-w-none text-slate-800 dark:text-slate-200"
-                    dangerouslySetInnerHTML={{ __html: formatStreamingContent(streamingMessage) }}
-                  />
-                  <span className="inline-block w-1.5 h-4 ml-1 bg-blue-400/40 animate-pulse rounded-sm" />
-              </div>
-            </div>
-          )}
-          </div>
-          <div ref={messagesEndRef} />
-        </div>
+      {/* Research Assistant Panel */}
+      <div className="research-panel hidden md:block w-72 border-l border-border">
+        {/* ResearchAssistant moved to the right sidebar only 
+        <ResearchAssistant
+          messages={chatMessages}
+          onSuggestionClick={(suggestion) => {
+            setInput(suggestion);
+            // Optional: Auto-submit if needed
+            // handleSubmit();
+          }}
+        />
+        */}
       </div>
-
-      {/* Input Area - Fixed at bottom */}
-      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur-md w-full">
-        {/* Attachment Preview */}
-        {attachments.length > 0 && (
-          <div className="w-full max-w-4xl mx-auto px-4 py-2 border-b border-border">
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="w-48">
-                  <AttachmentPreview 
-                    attachment={attachment}
-                    onRemove={removeAttachment}
-                    showControls={true}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ChatGPT-style Input Form */}
-        <div className="w-full max-w-4xl mx-auto p-4">
-          <form onSubmit={handleSubmit} className="relative">
-            <div className="relative flex items-center w-full rounded-xl border border-border shadow-sm bg-background">
-              {/* Main Input */}
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!isLoading && (input.trim() || attachments.length > 0)) {
-                      handleSubmit(e as unknown as FormEvent);
-                    }
-                  }
-                }}
-                placeholder={voiceState.isRecording ? 'Listening...' : `Message ${currentMode?.name || 'Assistant'}...`}
-                className="w-full resize-none px-4 py-3 max-h-48 rounded-xl focus:outline-none bg-transparent text-foreground placeholder:text-muted-foreground"
-                rows={1}
-          style={{ 
-                  minHeight: '44px',
-                  height: 'auto',
-                  overflowY: 'hidden'
-                }}
-                disabled={isLoading || voiceState.isRecording}
-              />
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 px-3">
-                {/* File Upload Button */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                title="Attach files"
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
-
-                {/* Voice Input Button */}
-              <button
-                type="button"
-                onClick={toggleVoiceRecording}
-                className={cn(
-                  "p-2 rounded-lg transition-colors",
-                    voiceState.isRecording 
-                      ? "text-red-500 bg-red-100" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-                title={voiceState.isRecording ? "Stop recording" : "Start voice input"}
-              >
-                {voiceState.isRecording ? (
-                  <MicOff className="w-5 h-5" />
-                ) : (
-                  <Mic className="w-5 h-5" />
-                )}
-              </button>
-
-              {/* Send Button */}
-              <button
-                type="submit"
-                disabled={isLoading || (!input.trim() && attachments.length === 0)}
-                className={cn(
-                    "p-2 rounded-lg transition-colors",
-                    "text-primary hover:text-primary/90",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
-                )}
-              >
-                {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                    <Send className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileChange}
-            className="hidden"
-            accept={Object.values(ALLOWED_FILE_TYPES).flat().join(',')}
-          />
-      </div>
-      </div>
-
-      {/* Workflow Creation Modal */}
-      {showWorkflowCreate && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-background rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium mb-4">Create Workflow</h3>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="workflowName" className="block text-sm font-medium mb-1">
-                  Workflow Name
-                </label>
-                <input
-                  type="text"
-                  id="workflowName"
-                  value={workflowName}
-                  onChange={(e) => setWorkflowName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border bg-background text-foreground"
-                  placeholder="Enter workflow name..."
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowWorkflowCreate(false)}
-                  className="px-4 py-2 rounded-md hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveWorkflow}
-                  disabled={!workflowName.trim()}
-                  className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  Save Workflow
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

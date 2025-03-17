@@ -4,7 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <title>GenieAgent</title>
+    <style>
+      /* Theme variables */
+      :root {
+        --office-blue: #0078d4;
+        --office-blue-hover: #106ebe;
+        --office-bg-light: #f3f2f1;
+        --office-border: #e1dfdd;
+        --office-text: #333333;
+        
+        --spiral-gold: #e6b44c;
+        --spiral-blue: #004080;
+        --spiral-bg-light: #f5f1e5;
+        --spiral-border: #e6b44c;
+        --spiral-text: #333333;
+      }
+      
+      .app-container {
+        min-height: 100vh;
+      }
+    </style>
   </head>
   <body>
     <!-- Add this SVG filter -->
@@ -18,7 +38,7 @@
         </filter>
       </defs>
     </svg>
-    <div id="root"></div>
+    <div id="root" class="app-container"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

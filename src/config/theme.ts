@@ -1,5 +1,8 @@
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type ColorProfile = 'default' | 'vibrant' | 'muted' | 'contrast';
+export type ColorProfile = 'default' | 'spiral';
 
 interface ColorSet {
   background: string;
@@ -28,48 +31,96 @@ interface ProfileConfig {
   dark: ColorSet;
 }
 
+// Default light theme
 const defaultLight: ColorSet = {
   background: '0 0% 100%',
-  foreground: '222.2 84% 4.9%',
+  foreground: '202 20% 30%',
   card: '0 0% 100%',
-  'card-foreground': '222.2 84% 4.9%',
+  'card-foreground': '202 20% 30%',
   popover: '0 0% 100%',
-  'popover-foreground': '222.2 84% 4.9%',
-  primary: '221.2 83.2% 53.3%',
-  'primary-foreground': '210 40% 98%',
-  secondary: '210 40% 96.1%',
-  'secondary-foreground': '222.2 47.4% 11.2%',
-  muted: '210 40% 96.1%',
-  'muted-foreground': '215.4 16.3% 46.9%',
-  accent: '210 40% 96.1%',
-  'accent-foreground': '222.2 47.4% 11.2%',
-  destructive: '0 84.2% 60.2%',
-  'destructive-foreground': '210 40% 98%',
-  border: '214.3 31.8% 91.4%',
-  input: '214.3 31.8% 91.4%',
-  ring: '221.2 83.2% 53.3%'
+  'popover-foreground': '202 20% 30%',
+  primary: '217 89% 61%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '137 87% 38%',
+  'secondary-foreground': '0 0% 100%',
+  muted: '220 14% 96%',
+  'muted-foreground': '220 8% 56%',
+  accent: '25 95% 53%',
+  'accent-foreground': '0 0% 100%',
+  destructive: '0 92% 45%',
+  'destructive-foreground': '0 0% 100%',
+  border: '220 13% 91%',
+  input: '220 13% 91%',
+  ring: '217 89% 61%'
 };
 
+// Default dark theme
 const defaultDark: ColorSet = {
-  background: '222.2 84% 4.9%',
-  foreground: '210 40% 98%',
-  card: '222.2 84% 4.9%',
-  'card-foreground': '210 40% 98%',
-  popover: '222.2 84% 4.9%',
-  'popover-foreground': '210 40% 98%',
-  primary: '217.2 91.2% 59.8%',
-  'primary-foreground': '222.2 47.4% 11.2%',
-  secondary: '217.2 32.6% 17.5%',
-  'secondary-foreground': '210 40% 98%',
-  muted: '217.2 32.6% 17.5%',
-  'muted-foreground': '215 20.2% 65.1%',
-  accent: '217.2 32.6% 17.5%',
-  'accent-foreground': '210 40% 98%',
-  destructive: '0 62.8% 30.6%',
+  background: '224 35% 15%',
+  foreground: '213 31% 91%',
+  card: '224 35% 15%',
+  'card-foreground': '213 31% 91%',
+  popover: '224 35% 15%',
+  'popover-foreground': '213 31% 91%',
+  primary: '217 89% 61%',
+  'primary-foreground': '0 0% 100%',
+  secondary: '137 87% 38%',
+  'secondary-foreground': '0 0% 100%',
+  muted: '223 30% 20%',
+  'muted-foreground': '215 20% 65%',
+  accent: '25 95% 53%',
+  'accent-foreground': '0 0% 100%',
+  destructive: '0 92% 45%',
+  'destructive-foreground': '0 0% 100%',
+  border: '216 34% 25%',
+  input: '216 34% 25%',
+  ring: '217 89% 61%'
+};
+
+// Spiral-inspired light theme
+const spiralLight: ColorSet = {
+  background: '0 0% 100%',
+  foreground: '220 20% 25%',
+  card: '0 0% 100%',
+  'card-foreground': '220 20% 25%',
+  popover: '0 0% 100%',
+  'popover-foreground': '220 20% 25%',
+  primary: '42 74% 60%', // Gold primary
+  'primary-foreground': '0 0% 100%',
+  secondary: '195 81% 62%', // Blue secondary
+  'secondary-foreground': '0 0% 100%',
+  muted: '42 74% 95%', // Light gold
+  'muted-foreground': '220 10% 45%',
+  accent: '220 60% 30%', // Dark blue accent
+  'accent-foreground': '0 0% 100%',
+  destructive: '0 85% 40%',
+  'destructive-foreground': '0 0% 100%',
+  border: '35 10% 83%',
+  input: '35 10% 83%',
+  ring: '42 74% 60%'
+};
+
+// Spiral-inspired dark theme
+const spiralDark: ColorSet = {
+  background: '220 40% 15%',
+  foreground: '35 30% 90%',
+  card: '220 40% 15%',
+  'card-foreground': '35 30% 90%',
+  popover: '220 40% 15%',
+  'popover-foreground': '35 30% 90%',
+  primary: '42 74% 50%', // Gold primary
+  'primary-foreground': '0 0% 0%',
+  secondary: '195 81% 50%', // Blue secondary
+  'secondary-foreground': '0 0% 0%',
+  muted: '220 40% 20%',
+  'muted-foreground': '35 20% 70%',
+  accent: '220 60% 40%', // Dark blue accent
+  'accent-foreground': '0 0% 100%',
+  destructive: '0 70% 50%',
   'destructive-foreground': '210 40% 98%',
-  border: '217.2 32.6% 17.5%',
-  input: '217.2 32.6% 17.5%',
-  ring: '224.3 76.3% 48%'
+  border: '220 40% 25%',
+  input: '220 40% 25%',
+  ring: '42 74% 50%'
 };
 
 export const themeProfiles: Record<ColorProfile, ProfileConfig> = {
@@ -77,48 +128,14 @@ export const themeProfiles: Record<ColorProfile, ProfileConfig> = {
     light: defaultLight,
     dark: defaultDark
   },
-  vibrant: {
-    light: {
-      ...defaultLight,
-      primary: '250 100% 60%',
-      accent: '330 100% 60%',
-      secondary: '170 100% 60%'
-    },
-    dark: {
-      ...defaultDark,
-      primary: '250 100% 70%',
-      accent: '330 100% 70%',
-      secondary: '170 100% 70%'
-    }
-  },
-  muted: {
-    light: {
-      ...defaultLight,
-      primary: '220 30% 60%',
-      accent: '330 30% 60%',
-      secondary: '170 30% 60%'
-    },
-    dark: {
-      ...defaultDark,
-      primary: '220 20% 40%',
-      accent: '330 20% 40%',
-      secondary: '170 20% 40%'
-    }
-  },
-  contrast: {
-    light: {
-      ...defaultLight,
-      background: '0 0% 100%',
-      foreground: '0 0% 0%',
-      primary: '220 100% 30%',
-      'primary-foreground': '0 0% 100%'
-    },
-    dark: {
-      ...defaultDark,
-      background: '0 0% 0%',
-      foreground: '0 0% 100%',
-      primary: '220 100% 70%',
-      'primary-foreground': '0 0% 0%'
-    }
+  spiral: {
+    light: spiralLight,
+    dark: spiralDark
   }
-}; 
+};
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export const defaultTheme = themeProfiles.default.light; 

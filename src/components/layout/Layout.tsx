@@ -48,8 +48,8 @@ export default function Layout({ children }: LayoutProps) {
         chatScreen.value = content;
         chatScreen.focus();
       }
-    } else if (action === 'search') {
-      console.log("Search action triggered with content:", content);
+    } else if (action === 'search' || action === 'workflow') {
+      console.log(`${action} action triggered with content:`, content);
       
       // Use the stored search handler if available
       if (searchHandlerRef.current) {
@@ -79,31 +79,35 @@ export default function Layout({ children }: LayoutProps) {
         setTimeout(() => {
           console.log("Attempting to submit form");
           
-          // Approach 1: Click the submit button if found
-          if (submitButton) {
-            console.log("Submit button found, clicking it");
-            (submitButton as HTMLButtonElement).click();
-            return;
+          if (action === 'workflow') {
+            console.log("Auto-submitting workflow suggestion");
+            
+            // Approach 1: Click the submit button if found
+            if (submitButton) {
+              console.log("Submit button found, clicking it");
+              (submitButton as HTMLButtonElement).click();
+              return;
+            }
+            
+            // Approach 2: Dispatch submit event on the form
+            if (form) {
+              console.log("Form found, dispatching submit event");
+              const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+              form.dispatchEvent(submitEvent);
+              return;
+            }
+            
+            // Approach 3: Simulate Enter key press on the input
+            console.log("Simulating Enter key press");
+            const keyEvent = new KeyboardEvent('keydown', {
+              bubbles: true, 
+              cancelable: true, 
+              key: 'Enter',
+              code: 'Enter',
+              keyCode: 13
+            });
+            chatScreen.dispatchEvent(keyEvent);
           }
-          
-          // Approach 2: Dispatch submit event on the form
-          if (form) {
-            console.log("Form found, dispatching submit event");
-            const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-            form.dispatchEvent(submitEvent);
-            return;
-          }
-          
-          // Approach 3: Simulate Enter key press on the input
-          console.log("Simulating Enter key press");
-          const keyEvent = new KeyboardEvent('keydown', {
-            bubbles: true, 
-            cancelable: true, 
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13
-          });
-          chatScreen.dispatchEvent(keyEvent);
           
           console.log("All submission attempts completed");
         }, 300); // Longer delay to ensure everything is ready

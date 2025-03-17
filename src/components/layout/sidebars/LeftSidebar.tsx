@@ -19,14 +19,23 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Eraser
+  Eraser,
+  HelpCircle,
+  Home,
+  FileText,
+  Clock,
+  Tag
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chat/chatStore';
 import { format, isValid } from 'date-fns';
+import { useThemeStore } from '@/stores/theme/themeStore';
+import { type ColorProfile } from '@/config/theme';
 
 interface LeftSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onShowThemeControls: () => void;
+  showThemeControls: boolean;
   className?: string;
 }
 
@@ -46,6 +55,8 @@ interface ChatGroup {
 const LeftSidebar: React.FC<LeftSidebarProps> = ({
   isCollapsed,
   onToggleCollapse,
+  onShowThemeControls,
+  showThemeControls,
   className
 }) => {
   const { 
@@ -63,6 +74,8 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     clearAllChats
   } = useChatStore();
 
+  const { profile: themeProfile } = useThemeStore();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([
@@ -70,6 +83,12 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     { title: 'Saved', chats: [], isCollapsed: false },
     { title: 'Recent', chats: [], isCollapsed: false }
   ]);
+  const [mainNavActive, setMainNavActive] = useState('chats');
+
+  // Check if we're using the Office theme profile
+  const isOfficeStyle = themeProfile === 'office' as ColorProfile;
+  // Check if we're using the Spiral theme profile
+  const isSpiralStyle = themeProfile === 'spiral' as ColorProfile;
 
   // Helper function to safely get timestamp
   const getTimestamp = (chat: any): Date => {
@@ -155,70 +174,208 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
   return (
     <div className={cn(
-      "flex flex-col h-full",
-      "bg-[--md-sys-color-surface]/98",
-      "border-r border-[--md-sys-color-outline-variant]",
-      "shadow-lg",
-      "transition-all duration-300 ease-in-out",
+      "flex flex-col h-full w-full overflow-hidden",
+      isCollapsed ? "items-center" : "items-stretch",
+      isOfficeStyle ? "bg-[#f3f2f1]" : 
+      isSpiralStyle ? "bg-[#f5f1e5]" : 
+      "bg-gray-50",
       className
-    )}
-    style={{
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      boxShadow: '4px 0 24px rgba(0, 0, 0, 0.14)'
-    }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[--md-sys-color-outline-variant]">
-        <div className={cn(
-          "flex items-center gap-3 group cursor-pointer",
-          isCollapsed && "hidden"
-        )}>
-          <div className="relative">
-            <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full opacity-80 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-300"></div>
-            <div className="relative bg-white dark:bg-gray-900 p-2 rounded-full border border-blue-300 dark:border-blue-800 shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-              <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+    )}>
+      {/* Top Section with logo and nav */}
+      <div className="flex flex-col flex-shrink-0">
+        {/* Logo - show conditionally based on collapse state */}
+        {!isCollapsed && (
+          <div className="p-4 mb-2 flex items-center gap-3">
+            <img 
+              src="/imageedit_1_6257830671.png" 
+              alt="GenieAgent Logo" 
+              className="h-8 w-auto"
+              style={{ 
+                filter: isSpiralStyle ? 'drop-shadow(0 0 2px rgba(230, 180, 76, 0.5))' : 'none'
+              }}
+            />
+            <span className={cn(
+              "font-semibold text-lg",
+              isOfficeStyle ? "text-[#0078d4]" : 
+              isSpiralStyle ? "text-[#004080]" : 
+              "text-gray-700"
+            )}>
+              GenieAgent
+            </span>
+          </div>
+        )}
+
+        {/* Office Style Navigation Header (When Office Theme is active) */}
+        {isOfficeStyle && !isCollapsed && (
+          <div className="w-full bg-[#f3f2f1] border-b border-gray-200">
+            <div className="flex items-center justify-between px-2 py-1.5">
+              {/* Office-style logo */}
+              <div className="flex items-center">
+                <img src="/imageedit_1_6257830671.png" alt="GenieAgent Logo" className="h-6 w-6 mr-1.5" />
+                <span className="font-semibold text-xs text-gray-700 tracking-tight">GenieAgent</span>
+              </div>
+              
+              <button
+                onClick={onToggleCollapse}
+                className="p-1 rounded-sm text-gray-700 hover:bg-gray-200"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            
+            {/* Tabs */}
+            <div className="flex px-1 pt-1">
+              <button
+                onClick={() => setMainNavActive('chats')}
+                className={cn(
+                  "px-2 py-1 text-xs border-b-2 font-medium",
+                  mainNavActive === 'chats' 
+                    ? "border-[#0078d4] text-[#0078d4]" 
+                    : "border-transparent text-gray-600 hover:text-[#0078d4] hover:border-[#0078d4]/30"
+                )}
+              >
+                Chats
+              </button>
+              <button
+                onClick={() => setMainNavActive('documents')}
+                className={cn(
+                  "px-2 py-1 text-xs border-b-2 font-medium",
+                  mainNavActive === 'documents' 
+                    ? "border-[#0078d4] text-[#0078d4]" 
+                    : "border-transparent text-gray-600 hover:text-[#0078d4] hover:border-[#0078d4]/30"
+                )}
+              >
+                Documents
+              </button>
             </div>
           </div>
-          <span className="font-bold text-[--md-sys-color-on-surface] tracking-tight group-hover:text-[--md-sys-color-primary] transition-colors duration-300">GenieAgent</span>
-        </div>
-        <button
-          onClick={onToggleCollapse}
-          className={cn(
-            "p-2 rounded-full",
-            "bg-[--md-sys-color-surface-variant]/70",
-            "border border-[--md-sys-color-outline-variant]",
-            "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
-            "hover:shadow-xl active:scale-95",
-            "transform-gpu hover:-translate-y-1",
-            "transition-all duration-300 ease-in-out",
-            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]"
-          )}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 transition-transform duration-300 hover:translate-x-0.5" />
-          ) : (
-            <ChevronLeft className="h-4 w-4 transition-transform duration-300 hover:-translate-x-0.5" />
-          )}
-        </button>
+        )}
+
+        {/* Non-Office Theme Header */}
+        {(!isOfficeStyle || isCollapsed) && (
+          <div className={cn(
+            "flex items-center justify-between p-4",
+            isOfficeStyle 
+              ? "border-b border-gray-200"
+              : "border-b border-[--md-sys-color-outline-variant]"
+          )}>
+            <div className={cn(
+              "flex items-center gap-3 group cursor-pointer",
+              isCollapsed && "hidden"
+            )}>
+              {isOfficeStyle ? (
+                /* Office-style logo */
+                <div className="flex items-center">
+                  <img src="/imageedit_1_6257830671.png" alt="GenieAgent Logo" className="h-6 w-6 mr-1.5" />
+                  <span className="font-semibold text-xs text-gray-700 tracking-tight">GenieAgent</span>
+                </div>
+              ) : (
+                /* Default style logo */
+                <div className="relative">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full opacity-80 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-300"></div>
+                  <img src="/imageedit_1_6257830671.png" alt="GenieAgent Logo" className="h-8 w-8 relative transition-all duration-300 group-hover:scale-105" />
+                  <span className="font-bold text-[--md-sys-color-on-surface] tracking-tight group-hover:text-[--md-sys-color-primary] transition-colors duration-300 ml-2">GenieAgent</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={onToggleCollapse}
+              className={cn(
+                "p-2 rounded-md",
+                isOfficeStyle
+                  ? "text-gray-700 hover:bg-gray-100"
+                  : "bg-[--md-sys-color-surface-variant]/70 border border-[--md-sys-color-outline-variant] hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline] hover:shadow-xl active:scale-95 transform-gpu hover:-translate-y-1 text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-primary]",
+                "transition-all duration-300 ease-in-out",
+              )}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Office-style Command Bar */}
+      {isOfficeStyle && !isCollapsed && (
+        <div className="flex p-2 bg-white border-b border-gray-200">
+          <div className="flex items-center space-x-1 w-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => createChat()}
+              className="h-8 text-xs font-medium flex items-center gap-1.5 text-[#0078d4] hover:bg-[#f3f2f1] rounded-sm px-2.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New Chat</span>
+            </Button>
+            
+            <div className="h-5 w-px bg-gray-300 mx-1"></div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {}}
+              className="h-8 text-xs font-medium flex items-center gap-1.5 text-gray-700 hover:bg-[#f3f2f1] rounded-sm px-2.5"
+            >
+              <Folder className="h-3.5 w-3.5" />
+              <span>Folders</span>
+            </Button>
+            
+            <div className="flex-grow"></div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowClearHistoryConfirm(true)}
+              className="h-8 text-xs font-medium flex items-center gap-1.5 text-gray-700 hover:bg-[#f3f2f1] rounded-sm px-2"
+            >
+              <Eraser className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Search Bar */}
       {!isCollapsed && (
-        <div className="px-4 py-3 border-b border-[--md-sys-color-outline-variant]">
+        <div className={cn(
+          "px-3 py-2",
+          isOfficeStyle 
+            ? "border-b border-gray-200"
+            : "border-b border-[--md-sys-color-outline-variant]"
+        )}>
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[--md-sys-color-on-surface-variant] group-hover:text-[--md-sys-color-primary] transition-colors duration-300" />
+            <Search className={cn(
+              "absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5",
+              isOfficeStyle
+                ? "text-gray-500" 
+                : "text-[--md-sys-color-on-surface-variant] group-hover:text-[--md-sys-color-primary] transition-colors duration-300"
+            )} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search chats..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-[--md-sys-color-surface-variant]/80 border border-[--md-sys-color-outline-variant] text-sm text-[--md-sys-color-on-surface] placeholder:text-[--md-sys-color-on-surface-variant]/70 focus:outline-none focus:ring-2 focus:ring-[--md-sys-color-primary]/30 focus:border-[--md-sys-color-primary]/40 hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline] hover:shadow-lg transform-gpu hover:-translate-y-1 transition-all duration-300 ease-in-out"
+              placeholder="Search"
+              className={cn(
+                "w-full pl-8 pr-3 py-1.5 text-sm focus:outline-none",
+                isOfficeStyle 
+                  ? "bg-[#f3f2f1] border border-transparent rounded-sm text-gray-800 placeholder:text-gray-500 focus:border-[#0078d4]"
+                  : "rounded-full bg-[--md-sys-color-surface-variant]/80 border border-[--md-sys-color-outline-variant] text-[--md-sys-color-on-surface] placeholder:text-[--md-sys-color-on-surface-variant]/70 focus:ring-2 focus:ring-[--md-sys-color-primary]/30 focus:border-[--md-sys-color-primary]/40 hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline] hover:shadow-lg transform-gpu hover:-translate-y-1",
+                "transition-all duration-150 ease-in-out"
+              )}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-[--md-sys-color-surface] text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-primary] transition-all duration-300"
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full",
+                  isOfficeStyle
+                    ? "hover:bg-gray-300 text-gray-500" 
+                    : "hover:bg-[--md-sys-color-surface] text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-primary]",
+                  "transition-all duration-150"
+                )}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -227,208 +384,343 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         </div>
       )}
 
-      {/* Chat List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin scrollbar-thumb-[--md-sys-color-outline-variant] scrollbar-track-transparent hover:scrollbar-thumb-[--md-sys-color-primary]/40 transition-colors duration-300">
-        {/* New Chat Button */}
-        <button
-          onClick={() => createChat()}
-          className={cn(
-            "flex items-center gap-2 w-full px-4 py-2.5 rounded-full",
-            "bg-[--md-sys-color-primary-container]/90 text-[--md-sys-color-on-primary-container]",
-            "border border-[--md-sys-color-primary]/20",
-            "hover:bg-[--md-sys-color-primary-container] hover:border-[--md-sys-color-primary]/40 hover:shadow-xl",
-            "active:scale-95",
-            "transform-gpu hover:-translate-y-1",
-            "transition-all duration-300 ease-in-out",
-            "font-medium"
-          )}
-        >
-          <div className="relative">
-            <div className="absolute -inset-1.5 bg-[--md-sys-color-primary]/40 rounded-full opacity-80 blur-md"></div>
-            <PlusCircle className="h-5 w-5 relative" />
-          </div>
-          {!isCollapsed && <span>New Chat</span>}
-        </button>
-
-        {/* Chat Groups */}
-        {filteredGroups.map((group, groupIndex) => (
-          <div key={group.title} className="space-y-2">
-            {/* Group Header */}
-            {!isCollapsed && (
-              <button
-                onClick={() => toggleGroupCollapse(groupIndex)}
-                className="flex items-center justify-between w-full px-3 py-1.5 text-sm font-medium text-[--md-sys-color-on-surface-variant] hover:bg-[--md-sys-color-surface-variant]/80 hover:text-[--md-sys-color-on-surface] rounded-lg transition-all duration-300 ease-in-out group"
-              >
-                <span className="uppercase tracking-wider text-xs opacity-90 group-hover:opacity-100 font-bold">
-                  {group.title}
-                  {group.chats.length > 0 && (
-                    <span className="ml-2 px-1.5 py-0.5 text-[10px] rounded-full bg-[--md-sys-color-surface-variant] group-hover:bg-[--md-sys-color-primary-container] transition-colors duration-300">
-                      {group.chats.length}
-                    </span>
-                  )}
-                </span>
-                {group.isCollapsed ? (
-                  <ChevronDown className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100 transition-transform duration-300 group-hover:translate-y-0.5" />
-                ) : (
-                  <ChevronUp className="h-3.5 w-3.5 opacity-80 group-hover:opacity-100 transition-transform duration-300 group-hover:-translate-y-0.5" />
-                )}
-              </button>
-            )}
-
-            {/* Chat Items */}
-            {!group.isCollapsed && (
-              <div className="space-y-2">
-                {group.chats.map((chat) => (
-                  <button
-                    key={chat.id}
-                    onClick={() => setActiveChat(chat.id)}
-                    className={cn(
-                      "flex items-start gap-3 w-full p-3 rounded-lg text-left",
-                      "border border-transparent",
-                      "hover:bg-[--md-sys-color-surface-variant] hover:border-[--md-sys-color-outline]",
-                      "transform-gpu hover:-translate-y-1 hover:shadow-lg",
-                      "transition-all duration-300 ease-in-out",
-                      activeChat === chat.id && "bg-[--md-sys-color-surface-variant] border-[--md-sys-color-outline] shadow-lg"
-                    )}
-                  >
-                    <div className={cn(
-                      "relative shrink-0 mt-0.5 transition-transform duration-300 group-hover:scale-110",
-                      activeChat === chat.id ? "text-[--md-sys-color-primary]" : "text-[--md-sys-color-on-surface-variant] group-hover:text-[--md-sys-color-primary]"
-                    )}>
-                      <MessageSquare className="h-5 w-5 transition-colors duration-300" />
-                      {(chat.isPinned || chat.isSaved) && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[--md-sys-color-primary] rounded-full animate-pulse"></div>
-                      )}
-                    </div>
-                    {!isCollapsed && (
-                      <div className="min-w-0 flex-1 group">
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "font-medium text-sm truncate transition-colors duration-300",
-                            activeChat === chat.id ? "text-[--md-sys-color-on-surface]" : "text-[--md-sys-color-on-surface-variant] group-hover:text-[--md-sys-color-on-surface]"
-                          )}>
-                            {chat.title}
-                          </span>
-                          <div className="flex items-center gap-1.5 ml-2">
-                            {chat.isPinned && (
-                              <Pin className="h-3 w-3 text-[--md-sys-color-primary] transition-transform duration-300 group-hover:rotate-12" />
-                            )}
-                            {chat.isSaved && (
-                              <Star className="h-3 w-3 text-[--md-sys-color-primary] transition-transform duration-300 group-hover:scale-110" />
-                            )}
-                          </div>
-                        </div>
-                        {chat.lastMessage && (
-                          <p className="text-xs text-[--md-sys-color-on-surface-variant]/80 group-hover:text-[--md-sys-color-on-surface-variant] truncate mt-1 transition-colors duration-300">
-                            {chat.lastMessage}
-                          </p>
-                        )}
-                        <span className="text-xs text-[--md-sys-color-on-surface-variant]/70 group-hover:text-[--md-sys-color-on-surface-variant]/90 block mt-1.5 transition-colors duration-300">
-                          {formatDate(chat.timestamp)}
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Footer Actions */}
-      <div className="shrink-0 p-4 space-y-2 border-t border-[--md-sys-color-outline-variant] bg-[--md-sys-color-surface]/98" style={{ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
-        <button
-          onClick={() => setShowClearHistoryConfirm(true)}
-          className={cn(
-            "flex items-center gap-3 w-full px-4 py-2.5 rounded-lg",
-            "hover:bg-[--md-sys-color-surface-variant] hover:shadow-lg",
-            "transform-gpu hover:-translate-y-1 active:scale-95",
-            "transition-all duration-300 ease-in-out",
-            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]",
-            "group"
-          )}
-        >
-          <Eraser className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
-          {!isCollapsed && <span className="font-medium">Clear History</span>}
-        </button>
-        <button
-          className={cn(
-            "flex items-center gap-3 w-full px-4 py-2.5 rounded-lg",
-            "hover:bg-[--md-sys-color-surface-variant] hover:shadow-lg",
-            "transform-gpu hover:-translate-y-1 active:scale-95",
-            "transition-all duration-300 ease-in-out",
-            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]",
-            "group"
-          )}
-        >
-          <Settings className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
-          {!isCollapsed && <span className="font-medium">Settings</span>}
-        </button>
-        <button
-          className={cn(
-            "flex items-center gap-3 w-full px-4 py-2.5 rounded-lg",
-            "hover:bg-[--md-sys-color-surface-variant] hover:shadow-lg",
-            "transform-gpu hover:-translate-y-1 active:scale-95",
-            "transition-all duration-300 ease-in-out",
-            "text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface]",
-            "group"
-          )}
-        >
-          <LogOut className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
-          {!isCollapsed && <span className="font-medium">Sign Out</span>}
-        </button>
-      </div>
-
-      {/* Clear History Confirmation Modal */}
-      {showClearHistoryConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-lg flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-[--md-sys-color-surface] border border-[--md-sys-color-outline] rounded-xl shadow-2xl p-6 max-w-md w-full space-y-4 animate-in slide-in-from-bottom-10 duration-300">
-            <h3 className="text-lg font-bold text-[--md-sys-color-on-surface]">Clear Chat History</h3>
-            <p className="text-sm text-[--md-sys-color-on-surface-variant]">
-              Are you sure you want to clear all chat history? This will delete all chats, including pinned and saved ones. This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowClearHistoryConfirm(false)}
-                className="px-4 py-2 rounded-lg hover:bg-[--md-sys-color-surface-variant] text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface] transition-all duration-300 ease-in-out transform-gpu hover:-translate-y-1 hover:shadow-lg active:scale-95"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearHistory}
-                className="px-4 py-2 rounded-lg bg-red-600/90 text-white hover:bg-red-600 transition-all duration-300 ease-in-out transform-gpu hover:-translate-y-1 hover:shadow-lg active:scale-95"
-              >
-                Clear All History
-              </button>
-            </div>
+      {/* Office Navigation Panel (Vertical) */}
+      {isOfficeStyle && !isCollapsed && (
+        <div className="px-2 py-1 bg-[#f9f9f9] border-b border-gray-200">
+          <div className="flex flex-col">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "justify-start text-xs h-7 px-2 mb-0.5 rounded-sm",
+                mainNavActive === 'home' 
+                  ? "bg-[#edebe9] text-[#0078d4] font-medium" 
+                  : "text-gray-700 hover:bg-[#f3f2f1]"
+              )}
+              onClick={() => setMainNavActive('home')}
+            >
+              <Home className="h-3.5 w-3.5 mr-2" />
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "justify-start text-xs h-7 px-2 mb-0.5 rounded-sm",
+                mainNavActive === 'chats' 
+                  ? "bg-[#edebe9] text-[#0078d4] font-medium" 
+                  : "text-gray-700 hover:bg-[#f3f2f1]"
+              )}
+              onClick={() => setMainNavActive('chats')}
+            >
+              <MessageSquare className="h-3.5 w-3.5 mr-2" />
+              All Chats
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "justify-start text-xs h-7 px-2 mb-0.5 rounded-sm",
+                mainNavActive === 'documents' 
+                  ? "bg-[#edebe9] text-[#0078d4] font-medium" 
+                  : "text-gray-700 hover:bg-[#f3f2f1]"
+              )}
+              onClick={() => setMainNavActive('documents')}
+            >
+              <FileText className="h-3.5 w-3.5 mr-2" />
+              Documents
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "justify-start text-xs h-7 px-2 mb-0.5 rounded-sm",
+                mainNavActive === 'history' 
+                  ? "bg-[#edebe9] text-[#0078d4] font-medium" 
+                  : "text-gray-700 hover:bg-[#f3f2f1]"
+              )}
+              onClick={() => setMainNavActive('history')}
+            >
+              <Clock className="h-3.5 w-3.5 mr-2" />
+              History
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Clear Chat Confirmation Modal */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-lg flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-[--md-sys-color-surface] border border-[--md-sys-color-outline] rounded-xl shadow-2xl p-6 max-w-md w-full space-y-4 animate-in slide-in-from-bottom-10 duration-300">
-            <h3 className="text-lg font-bold text-[--md-sys-color-on-surface]">Clear Chat</h3>
-            <p className="text-sm text-[--md-sys-color-on-surface-variant]">
-              Are you sure you want to clear this chat? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowClearConfirm(false)}
-                className="px-4 py-2 rounded-lg hover:bg-[--md-sys-color-surface-variant] text-[--md-sys-color-on-surface-variant] hover:text-[--md-sys-color-on-surface] transition-all duration-300 ease-in-out transform-gpu hover:-translate-y-1 hover:shadow-lg active:scale-95"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleClearChat}
-                className="px-4 py-2 rounded-lg bg-red-600/90 text-white hover:bg-red-600 transition-all duration-300 ease-in-out transform-gpu hover:-translate-y-1 hover:shadow-lg active:scale-95"
-              >
-                Clear Chat
-              </button>
-            </div>
+      {/* Chat List */}
+      <div className={cn(
+        "flex-1 overflow-hidden overflow-y-auto max-h-[calc(100vh-16rem)]",
+        isSpiralStyle ? "scrollbar-thin-spiral" : "scrollbar-thin"
+      )}>
+        {searchQuery && (
+          <div className="px-3 py-2 text-sm text-gray-500">
+            Showing results for "{searchQuery}"
           </div>
+        )}
+
+        {/* New Chat Button */}
+        <div className={cn(
+          "px-2 pb-2 pt-1",
+          isCollapsed ? "w-full" : "w-auto"
+        )}>
+          <Button
+            onClick={createChat}
+            className={cn(
+              "w-full justify-center",
+              isCollapsed ? "px-2" : "px-4",
+              isOfficeStyle 
+                ? "bg-[#0078d4] hover:bg-[#106ebe] text-white" 
+                : isSpiralStyle
+                  ? "bg-[#004080] hover:bg-[#01305f] text-white border border-[#e6b44c]"
+                  : "bg-gray-800 hover:bg-gray-700 text-white"
+            )}
+            size={isCollapsed ? "sm" : "default"}
+          >
+            <Plus className="h-4 w-4 mr-0 md:mr-2" />
+            {!isCollapsed && <span>New Chat</span>}
+          </Button>
+        </div>
+
+        {filteredGroups.length > 0 ? (
+          filteredGroups.map((group, index) => (
+            <div key={group.title} className={cn("mb-2", isOfficeStyle && "px-1")}>
+              {/* Group header */}
+              {isOfficeStyle ? (
+                <div 
+                  className="flex items-center justify-between py-1 px-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer"
+                  onClick={() => toggleGroupCollapse(index)}
+                >
+                  <div className="flex items-center">
+                    {group.isCollapsed ? (
+                      <ChevronRight className="h-3 w-3 mr-1" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 mr-1" />
+                    )}
+                    {group.title}
+                  </div>
+                  <span className="text-xs">{group.chats.length}</span>
+                </div>
+              ) : (
+                <div 
+                  className="flex items-center justify-between px-2 text-[--md-sys-color-on-surface-variant] mb-2"
+                  onClick={() => toggleGroupCollapse(index)}
+                >
+                  <div className="flex items-center cursor-pointer">
+                    <button className="p-1 hover:bg-[--md-sys-color-surface] rounded-full">
+                      {group.isCollapsed ? (
+                        <ChevronRight className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                    
+                    <h3 className="text-xs font-medium uppercase tracking-wider ml-1">
+                      {group.title}
+                    </h3>
+                  </div>
+                  <span className="text-xs">{group.chats.length}</span>
+                </div>
+              )}
+
+              {/* Group chats */}
+              {!group.isCollapsed && (
+                <div className={isOfficeStyle ? "space-y-0.5" : "space-y-1"}>
+                  {group.chats.map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => setActiveChat(chat.id)}
+                      className={cn(
+                        "w-full text-left",
+                        isOfficeStyle ? (
+                          activeChat === chat.id
+                            ? "bg-[#e1effa] border-l-2 border-[#0078d4]"
+                            : "hover:bg-[#f3f2f1] border-l-2 border-transparent"
+                        ) : (
+                          activeChat === chat.id
+                            ? "bg-[--md-sys-color-secondary-container] text-[--md-sys-color-on-secondary-container] rounded-lg"
+                            : "hover:bg-[--md-sys-color-surface] hover:text-[--md-sys-color-on-surface] rounded-lg"
+                        ),
+                        isOfficeStyle 
+                          ? "py-1.5 px-2 transition-colors" 
+                          : "p-3 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 transform-gpu"
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <h4 className={cn(
+                          "font-medium line-clamp-1",
+                          isOfficeStyle ? "text-xs" : "text-base"
+                        )}>
+                          {chat.title}
+                        </h4>
+                        <div className="flex items-center space-x-1">
+                          {chat.isPinned && (
+                            <Pin className={cn(
+                              isOfficeStyle ? "h-3 w-3 text-[#0078d4]" : "h-3.5 w-3.5 text-[--md-sys-color-on-surface-variant]"
+                            )} />
+                          )}
+                          {chat.isSaved && (
+                            <Star className={cn(
+                              isOfficeStyle ? "h-3 w-3 text-[#0078d4]" : "h-3.5 w-3.5 fill-[--md-sys-color-tertiary] text-[--md-sys-color-tertiary]"
+                            )} />
+                          )}
+                        </div>
+                      </div>
+                      {chat.lastMessage && (
+                        <p className={cn(
+                          "line-clamp-1 mt-0.5",
+                          isOfficeStyle ? "text-[10px] text-gray-500" : "text-xs text-[--md-sys-color-on-surface-variant]"
+                        )}>
+                          {chat.lastMessage}
+                        </p>
+                      )}
+                      <div className={cn(
+                        "mt-1",
+                        isOfficeStyle ? "text-[9px] text-gray-400" : "text-[10px] text-[--md-sys-color-on-surface-variant]/70"
+                      )}>
+                        {formatDate(chat.timestamp)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className={cn(
+            "flex flex-col items-center justify-center h-32 p-4 text-center",
+            isOfficeStyle ? "bg-[#f3f2f1] rounded-sm text-gray-500 mx-2" : "bg-[--md-sys-color-surface-variant]/30 text-[--md-sys-color-on-surface-variant] rounded-lg"
+          )}>
+            <MessageSquare className={cn(
+              "h-5 w-5 mb-2",
+              isOfficeStyle ? "text-[#0078d4]" : "text-[--md-sys-color-primary]"
+            )} />
+            <p className="text-xs">No chats found</p>
+            <p className="text-[10px] mt-1">Start a new chat or try a different search</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer with Settings & Clear History */}
+      {!isCollapsed && !isOfficeStyle && (
+        <div className="p-4 border-t border-[--md-sys-color-outline-variant] bg-[--md-sys-color-surface]/95">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onShowThemeControls}
+              className={cn(
+                "p-2 rounded-full",
+                showThemeControls 
+                  ? "bg-[--md-sys-color-primary]/10 text-[--md-sys-color-primary]" 
+                  : "text-[--md-sys-color-on-surface-variant] hover:bg-[--md-sys-color-surface] hover:text-[--md-sys-color-primary]"
+              )}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowClearHistoryConfirm(true)}
+              className="p-2 rounded-full text-[--md-sys-color-on-surface-variant] hover:bg-[--md-sys-color-surface] hover:text-[--md-sys-color-error]"
+            >
+              <Eraser className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 rounded-full text-[--md-sys-color-on-surface-variant] hover:bg-[--md-sys-color-surface] hover:text-[--md-sys-color-primary]"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {showClearHistoryConfirm && (
+            <div className="mt-3 p-3 bg-[--md-sys-color-error-container] text-[--md-sys-color-on-error-container] rounded-lg">
+              <p className="text-xs mb-2">Clear all chat history?</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearHistory}
+                  className="text-xs py-0 h-7 bg-[--md-sys-color-error] text-[--md-sys-color-on-error]"
+                >
+                  Clear All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowClearHistoryConfirm(false)}
+                  className="text-xs py-0 h-7 border-[--md-sys-color-on-error-container]"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Office Style Footer */}
+      {!isCollapsed && isOfficeStyle && (
+        <div className="p-2 border-t border-gray-200 mt-auto">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onShowThemeControls}
+              className={cn(
+                "p-1.5 rounded-sm text-gray-600 hover:bg-[#f3f2f1]",
+                showThemeControls && "text-[#0078d4] bg-[#e1effa]"
+              )}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {}}
+              className="p-1.5 rounded-sm text-gray-600 hover:bg-[#f3f2f1]"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1.5 rounded-sm text-gray-600 hover:bg-[#f3f2f1]"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          {/* Clear History Dialog */}
+          {showClearHistoryConfirm && (
+            <div className="mt-2 p-2 bg-[#fdf6f6] border border-[#d13438]/30 text-[#d13438] rounded-sm text-xs">
+              <p className="mb-2 font-medium">Clear all chat history?</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearHistory}
+                  className="text-[10px] py-0 h-6 bg-[#d13438] text-white"
+                >
+                  Clear All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowClearHistoryConfirm(false)}
+                  className="text-[10px] py-0 h-6 border-[#d13438]/50 text-[#d13438]"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

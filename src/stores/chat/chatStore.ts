@@ -51,6 +51,7 @@ interface ChatState {
   showClearConfirm: boolean;
   createChat: () => string;
   addMessage: (chatId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+  removeMessage: (chatId: string, messageId: string) => void;
   saveChat: (chatId: string) => void;
   unsaveChat: (chatId: string) => void;
   pinChat: (chatId: string) => void;
@@ -118,14 +119,27 @@ export const useChatStore = create<ChatState>()(
               };
 
               // Update chat title if it's the first user message
-              const newTitle = chat.messages.length === 0 && message.role === 'user'
-                ? message.content.slice(0, 50) + (message.content.length > 50 ? '...' : '')
-                : chat.title;
-
               return {
                 ...chat,
-                title: newTitle,
                 messages: [...chat.messages, newMessage],
+                updatedAt: new Date(),
+                title: chat.title === 'New Chat' && message.role === 'user' && chat.messages.length === 0
+                  ? message.content.substring(0, 30) + (message.content.length > 30 ? '...' : '')
+                  : chat.title
+              };
+            }
+            return chat;
+          })
+        }));
+      },
+
+      removeMessage: (chatId, messageId) => {
+        set(state => ({
+          chats: state.chats.map(chat => {
+            if (chat.id === chatId) {
+              return {
+                ...chat,
+                messages: chat.messages.filter(msg => msg.id !== messageId),
                 updatedAt: new Date()
               };
             }

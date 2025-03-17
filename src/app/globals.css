@@ -2,8 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme transition for smooth light/dark mode changes */
+.theme-transition {
+  transition: background-color 0.3s ease, 
+              color 0.3s ease, 
+              border-color 0.3s ease, 
+              box-shadow 0.3s ease;
+}
+
+.theme-transition * {
+  transition: background-color 0.3s ease, 
+              color 0.3s ease, 
+              border-color 0.3s ease, 
+              box-shadow 0.3s ease !important;
+}
+
 @layer base {
   :root {
+    /* Google-inspired Light Theme Colors */
+    --background: 0 0% 100%;
+    --foreground: 202 20% 30%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 202 20% 30%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 202 20% 30%;
+    
+    --primary: 217 89% 61%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 137 87% 38%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 56%;
+    
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 92% 45%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 89% 61%;
+
+    --radius: 0.5rem;
+
+    /* Google Material Design elevated surfaces */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 8px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
     /* Google Material Design 3 Colors - 20% Darker & More Saturated */
     --md-sys-color-primary: #0d5bca; /* Darker blue */
     --md-sys-color-on-primary: #ffffff;
@@ -43,6 +95,41 @@
   }
 
   .dark {
+    /* Google-inspired Dark Theme Colors */
+    --background: 224 35% 15%;
+    --foreground: 213 31% 91%;
+    
+    --card: 224 35% 15%;
+    --card-foreground: 213 31% 91%;
+    
+    --popover: 224 35% 15%;
+    --popover-foreground: 213 31% 91%;
+    
+    --primary: 217 89% 61%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 137 87% 38%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 223 30% 20%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 92% 45%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 216 34% 25%;
+    --input: 216 34% 25%;
+    --ring: 217 89% 61%;
+
+    /* Darker shadows for dark mode */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+
     /* Dark mode - 20% Darker & More Saturated */
     --md-sys-color-primary: #4285f4; /* More vibrant blue */
     --md-sys-color-on-primary: #000000;
@@ -74,15 +161,122 @@
     --md-sys-elevation-2: 0 2px 4px rgba(0,0,0,0.4), 0 3px 8px 2px rgba(0,0,0,0.3);
     --md-sys-elevation-3: 0 6px 10px 3px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.4);
   }
+  
+  /* Apply Office theme */
+  .office {
+    &:not(.dark) {
+      /* Microsoft Office Light Theme */
+      --primary: 208 90% 40%;
+      --primary-foreground: 0 0% 100%;
+      --accent: 265 90% 50%;
+      --accent-foreground: 0 0% 100%;
+    }
+    
+    &.dark {
+      /* Microsoft Office Dark Theme */
+      --primary: 208 90% 60%;
+      --primary-foreground: 0 0% 0%;
+      --accent: 265 90% 60%;
+      --accent-foreground: 0 0% 0%;
+    }
+  }
 }
 
 @layer base {
   * {
-    @apply border-[--md-sys-color-outline];
+    @apply border-border;
   }
   body {
-    @apply bg-[--md-sys-color-background] text-[--md-sys-color-on-background];
+    @apply bg-background text-foreground transition-colors;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Google-inspired UI Components */
+.card {
+  @apply bg-card text-card-foreground rounded-lg border border-border shadow-sm;
+}
+
+.button {
+  @apply rounded-md font-medium transition-all;
+}
+
+.button-primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90;
+}
+
+.button-secondary {
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+}
+
+.input {
+  @apply bg-background border border-input rounded-md px-3 py-2 text-sm;
+}
+
+.select {
+  @apply bg-background border border-input rounded-md px-3 py-2 text-sm;
+}
+
+/* Google Material Design inspired elevation classes */
+.elevation-1 {
+  box-shadow: var(--shadow-sm);
+}
+
+.elevation-2 {
+  box-shadow: var(--shadow-md);
+}
+
+.elevation-3 {
+  box-shadow: var(--shadow-lg);
+}
+
+.elevation-4 {
+  box-shadow: var(--shadow-xl);
+}
+
+/* Google-inspired rounded corners */
+.rounded-google {
+  border-radius: 8px;
+}
+
+.rounded-google-sm {
+  border-radius: 4px;
+}
+
+.rounded-google-lg {
+  border-radius: 16px;
+}
+
+/* Microsoft Office-inspired styles */
+.office-header {
+  @apply bg-primary text-primary-foreground p-2;
+}
+
+.office-sidebar {
+  @apply bg-muted border-r border-border;
+}
+
+.office-content {
+  @apply bg-background p-4;
+}
+
+/* Modern scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted/50 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+}
+
+/* Custom focus styles */
+.focus-ring {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
 }
 
 /* Enhanced animations */
@@ -611,10 +805,6 @@
 }
 
 /* Accessibility improvements */
-.focus-ring {
-  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;

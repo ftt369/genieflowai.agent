@@ -9,16 +9,45 @@ import { nanoid } from 'nanoid';
 // Set the PDF.js worker source
 GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Initialize Tesseract worker
+// Tesseract worker initialization using newer API
 let tesseractWorker: any = null;
+let isWorkerInitializing = false;
 
 async function initTesseractWorker() {
-  if (!tesseractWorker) {
-    tesseractWorker = await createWorker();
+  if (tesseractWorker) return tesseractWorker;
+  
+  if (isWorkerInitializing) {
+    // Wait for existing initialization to complete
+    while (isWorkerInitializing) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return tesseractWorker;
+  }
+  
+  try {
+    isWorkerInitializing = true;
+    console.log('Initializing Tesseract worker...');
+    
+    tesseractWorker = await createWorker({
+      logger: progress => {
+        if (progress.status === 'recognizing text') {
+          console.log(`OCR progress: ${(progress.progress * 100).toFixed(2)}%`);
+        }
+      }
+    });
+    
+    // Initialize with English language
     await tesseractWorker.loadLanguage('eng');
     await tesseractWorker.initialize('eng');
+    console.log('Tesseract worker initialized successfully');
+    
+    return tesseractWorker;
+  } catch (error) {
+    console.error('Error initializing Tesseract worker:', error);
+    throw error;
+  } finally {
+    isWorkerInitializing = false;
   }
-  return tesseractWorker;
 }
 
 /**
@@ -88,88 +117,144 @@ async function extractPDFContent(file: File): Promise<string> {
     // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
       console.log(`Processing page ${i} of ${pdf.numPages}`);
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n\n';
-      console.log(`Page ${i} processed, text length:`, pageText.length);
+      try {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n\n';
+        console.log(`Page ${i} processed, text length:`, pageText.length);
+      } catch (pageError) {
+        console.warn(`Error processing page ${i}:`, pageError);
+        // Continue with other pages even if one fails
+      }
     }
 
     // Check if text was successfully extracted
     if (!fullText.trim()) {
       console.log('No text found in PDF, attempting OCR...');
-      return await performOCROnPDF(file);
+      try {
+        return await performOCROnPDF(file);
+      } catch (ocrError) {
+        console.error('OCR failed:', ocrError);
+        throw new Error('PDF contains no extractable text and OCR failed');
+      }
     }
 
     console.log('PDF text extraction completed, total length:', fullText.length);
     return fullText.trim();
   } catch (error: any) {
     console.error('Error in PDF extraction:', error);
-    // Try OCR as fallback
-    try {
-      console.log('Attempting OCR fallback...');
-      return await performOCROnPDF(file);
-    } catch (ocrError: any) {
-      console.error('OCR fallback failed:', ocrError);
-      throw new Error(`Failed to extract PDF content: ${error.message}`);
+    // Try OCR as fallback only for certain errors that suggest the PDF might be image-based
+    if (error.message.includes('No such page') || 
+        error.message.includes('getTextContent') || 
+        error.message.includes('Page is not loaded')) {
+      try {
+        console.log('Attempting OCR fallback...');
+        return await performOCROnPDF(file);
+      } catch (ocrError: any) {
+        console.error('OCR fallback failed:', ocrError);
+        throw new Error(`Failed to extract PDF content. OCR also failed: ${ocrError.message}`);
+      }
     }
+    throw new Error(`Failed to extract PDF content: ${error.message}`);
   }
 }
 
 async function performOCROnPDF(file: File): Promise<string> {
+  let worker: any = null;
+  
   try {
     console.log('Starting OCR process for PDF:', file.name);
-    const worker = await initTesseractWorker();
-    
+
+    // Initialize Tesseract worker
+    try {
+      worker = await initTesseractWorker();
+      console.log('Tesseract worker ready');
+    } catch (workerError) {
+      console.error('Failed to initialize Tesseract worker:', workerError);
+      throw new Error('OCR engine failed to initialize');
+    }
+
     // Load the PDF
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
 
-    // Process each page
-    for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Processing page ${i} with OCR`);
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
-      
-      // Create canvas and render PDF page
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      
-      await page.render({
-        canvasContext: context!,
-        viewport: viewport
-      }).promise;
+    // Limit processing to first few pages for large PDFs
+    const maxPagesToProcess = Math.min(pdf.numPages, 10); // Process max 10 pages to avoid timeout 
 
-      // Perform OCR on the rendered page
-      console.log(`Running OCR on page ${i}`);
-      const { data: { text } } = await worker.recognize(canvas);
-      fullText += text + '\n\n';
-      console.log(`OCR completed for page ${i}, text length:`, text.length);
+    // Process each page
+    for (let i = 1; i <= maxPagesToProcess; i++) {
+      try {
+        console.log(`Processing page ${i}/${maxPagesToProcess} with OCR`);
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 }); // Balance between quality and speed
+
+        // Create canvas and render PDF page
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) {
+          console.error('Failed to get canvas context');
+          continue; // Skip this page but continue with others
+        }
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+
+        // Convert canvas to image data URL
+        const imageData = canvas.toDataURL('image/png');
+
+        // Perform OCR on the rendered page using the updated API
+        console.log(`Running OCR on page ${i}`);
+        const result = await worker.recognize(imageData);
+        const text = result.data.text;
+        fullText += text + '\n\n';
+        console.log(`OCR completed for page ${i}, text length:`, text.length);
+      } catch (pageError) {
+        console.warn(`Error performing OCR on page ${i}:`, pageError);
+        // Continue with other pages
+      }
+    }
+
+    if (pdf.numPages > maxPagesToProcess) {
+      fullText += `\n\n[Note: OCR was limited to the first ${maxPagesToProcess} pages of ${pdf.numPages} total pages]\n`;
     }
 
     console.log('OCR process completed, total length:', fullText.length);
-    return fullText.trim();
+
+    return fullText.trim() || 'No text could be extracted via OCR';
   } catch (error: any) {
-    console.error('Error in OCR process:', error);
+    console.error('Error in PDF OCR process:', error);
     throw new Error(`OCR processing failed: ${error.message}`);
   }
 }
 
 async function extractImageText(file: File): Promise<string> {
   try {
+    console.log('Starting OCR for image:', file.name);
     const worker = await initTesseractWorker();
+    
     const imageUrl = URL.createObjectURL(file);
-    const { data: { text } } = await worker.recognize(imageUrl);
+    console.log('Image URL created:', imageUrl);
+    
+    // Use the updated API
+    const result = await worker.recognize(imageUrl);
+    const text = result.data.text;
+    
+    console.log('OCR completed for image, text length:', text.length);
     URL.revokeObjectURL(imageUrl);
-    return text.trim();
+    
+    return text.trim() || 'No text could be extracted from the image';
   } catch (error) {
     console.error('Error extracting image text:', error);
-    throw error;
+    throw new Error(`Image OCR failed: ${error}`);
   }
 }
 
@@ -309,7 +394,19 @@ export async function processFile(file: File) {
     if (file.type.includes('pdf') || fileExt === 'pdf') {
       fileType = 'pdf';
       // Handle PDF files
-      // ... existing PDF handling code
+      console.log(`Determined file type: ${fileType}`);
+      console.log(`Extracting content from ${file.name}...`);
+      
+      try {
+        content = await extractFileContent(file);
+        console.log(`Content extracted from PDF, length: ${content.length} characters`);
+      } catch (pdfError) {
+        console.error('Error extracting PDF content:', pdfError);
+        return {
+          success: false,
+          message: `Failed to extract content from ${file.name}`
+        };
+      }
     } else if (file.type.includes('word') || fileExt === 'doc' || fileExt === 'docx') {
       fileType = 'document';
       console.log(`Determined file type: ${fileType}`);
