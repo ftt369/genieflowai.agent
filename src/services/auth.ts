@@ -1,75 +1,120 @@
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut,
-  sendPasswordResetEmail,
-  onAuthStateChanged,
-  User,
-} from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
-import type { FirebaseUser } from '../types/firebase';
+import { supabase } from '../config/services';
+import { User, Provider } from '@supabase/supabase-js';
 
-const googleProvider = new GoogleAuthProvider();
+export type AuthUser = User;
 
-export const authService = {
-  // Email & Password Sign Up
-  async signUpWithEmail(email: string, password: string, fullName: string): Promise<void> {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await this.createUserProfile(userCredential.user, { fullName });
-  },
+export interface AuthResponse {
+  user: AuthUser | null;
+  session: any | null;
+  error: Error | null;
+}
 
-  // Email & Password Sign In
-  async signInWithEmail(email: string, password: string): Promise<User> {
-    const { user } = await signInWithEmailAndPassword(auth, email, password);
-    return user;
-  },
-
-  // Google Sign In
-  async signInWithGoogle(): Promise<User> {
-    const { user } = await signInWithPopup(auth, googleProvider);
-    const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
+// Sign up with email and password
+export const signUp = async (email: string, password: string): Promise<AuthResponse> => {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
     
-    if (isNewUser) {
-      await this.createUserProfile(user, {
-        fullName: user.displayName || '',
-      });
-    }
-    
-    return user;
-  },
-
-  // Sign Out
-  async signOut(): Promise<void> {
-    await signOut(auth);
-  },
-
-  // Password Reset
-  async resetPassword(email: string): Promise<void> {
-    await sendPasswordResetEmail(auth, email);
-  },
-
-  // Create User Profile
-  private async createUserProfile(user: User, additionalData: { fullName: string }): Promise<void> {
-    const userRef = doc(db, 'users', user.uid);
-    const userData: FirebaseUser = {
-      uid: user.uid,
-      email: user.email!,
-      fullName: additionalData.fullName,
-      avatarUrl: user.photoURL || undefined,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      status: 'active',
-      role: 'user',
+    return {
+      user: data?.user || null,
+      session: data?.session || null,
+      error: error,
     };
+  } catch (error) {
+    return {
+      user: null,
+      session: null,
+      error: error as Error,
+    };
+  }
+};
 
-    await setDoc(userRef, userData);
-  },
+// Sign in with email and password
+export const signIn = async (email: string, password: string): Promise<AuthResponse> => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    return {
+      user: data?.user || null,
+      session: data?.session || null,
+      error: error,
+    };
+  } catch (error) {
+    return {
+      user: null,
+      session: null,
+      error: error as Error,
+    };
+  }
+};
 
-  // Auth State Observer
-  onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return onAuthStateChanged(auth, callback);
-  },
+// Sign out
+export const signOut = async (): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
+};
+
+// Get current user
+export const getCurrentUser = async (): Promise<AuthUser | null> => {
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data?.user || null;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+// Get current session
+export const getSession = async () => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+  } catch (error) {
+    console.error('Error getting session:', error);
+    return null;
+  }
+};
+
+// Password reset request
+export const resetPassword = async (email: string): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
+};
+
+// Update user password
+export const updatePassword = async (new_password: string): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.updateUser({ password: new_password });
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
+};
+
+// Sign in with OAuth provider
+export const signInWithProvider = async (provider: Provider) => {
+  return await supabase.auth.signInWithOAuth({
+    provider,
+  });
+};
+
+// Auth state change listener
+export const onAuthStateChange = (callback: (user: AuthUser | null) => void) => {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(session?.user || null);
+  });
 }; 

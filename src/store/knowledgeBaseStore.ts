@@ -2,6 +2,92 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { KnowledgeBase, KnowledgeDocument, MarketplaceItem } from '../types/knowledgeBase';
 
+// Initial knowledge bases
+const INITIAL_KNOWLEDGE_BASES: KnowledgeBase[] = [
+  {
+    id: 'ca_workers_comp_knowledge',
+    name: 'California Workers\' Compensation',
+    description: 'Knowledge base containing California workers\' compensation laws, templates, and procedures',
+    documents: [
+      {
+        id: 'ca_workers_comp_templates',
+        name: 'CA Workers\' Comp Templates',
+        type: 'text',
+        source: 'api',
+        content: 'This document links to the Workers\' Compensation templates located in src/templates/legal/workers-comp/.',
+        metadata: {
+          author: 'System',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          size: 1024,
+          tags: ['templates', 'workers comp', 'California'],
+          category: 'Legal',
+          sourceUrl: '/src/templates/legal/workers-comp/',
+          version: '1.0.0',
+        },
+      },
+      {
+        id: 'ca_labor_code',
+        name: 'California Labor Code Sections 3200-6208',
+        type: 'text',
+        source: 'api',
+        content: 'Reference to California Labor Code Sections 3200-6208 covering workers\' compensation laws.',
+        metadata: {
+          author: 'State of California',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          size: 2048,
+          tags: ['labor code', 'statutes', 'California'],
+          category: 'Legal',
+          sourceUrl: 'https://leginfo.legislature.ca.gov/',
+          version: '2023',
+        },
+      },
+      {
+        id: 'wcab_procedures',
+        name: 'WCAB Rules of Practice and Procedure',
+        type: 'text',
+        source: 'api',
+        content: 'Workers\' Compensation Appeals Board Rules of Practice and Procedure.',
+        metadata: {
+          author: 'WCAB',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          size: 1536,
+          tags: ['WCAB', 'procedures', 'California'],
+          category: 'Legal',
+          sourceUrl: 'https://www.dir.ca.gov/wcab/WCABProceduralRegulations.htm',
+          version: '2023',
+        },
+      }
+    ],
+    metadata: {
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      owner: 'system',
+      isPublic: true,
+      tags: ['workers comp', 'California', 'legal', 'templates'],
+      category: 'Legal',
+      version: '1.0.0',
+      stats: {
+        documentCount: 3,
+        totalSize: 4608,
+        lastUpdated: new Date(),
+      },
+    },
+    config: {
+      allowedDocumentTypes: ['text', 'pdf', 'webpage', 'code'],
+      maxDocumentSize: 10 * 1024 * 1024, // 10MB
+      embeddingModel: 'text-embedding-ada-002',
+      searchConfig: {
+        algorithm: 'cosine',
+        minScore: 0.7,
+        maxResults: 10,
+      },
+    },
+  }
+];
+
 interface KnowledgeBaseState {
   knowledgeBases: KnowledgeBase[];
   activeKnowledgeBaseId: string | null;
@@ -30,7 +116,7 @@ interface KnowledgeBaseState {
 }
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseState>((set, get) => ({
-  knowledgeBases: [],
+  knowledgeBases: INITIAL_KNOWLEDGE_BASES,
   activeKnowledgeBaseId: null,
   marketplaceItems: [],
   searchResults: [],

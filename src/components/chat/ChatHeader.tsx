@@ -20,11 +20,14 @@ import {
   Bot,
   Edit2,
   CheckCircle,
-  Loader2
+  Loader2,
+  Bookmark,
+  BookmarkMinus
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chat/chatStore';
 import { useModeStore, type AssistantMode } from '@/stores/model/modeStore';
 import ModeDropdown from './ModeDropdown';
+import ExhibitExporterButton from '../ExhibitExporterButton';
 
 // Lazy load modals
 const AiSettings = lazy(() => import('@/components/settings/AiSettings'));
@@ -151,257 +154,234 @@ export default function ChatHeader({
 
   return (
     <>
-      <div className={cn(
-        "flex items-center justify-between w-full py-2 px-4 border-b",
-        isSpiralStyle ? "bg-blue-900 text-white border-amber-400" : 
-        "bg-background border-border"
+      <header className={cn(
+        "px-4 py-2 border-b flex items-center justify-between gap-2",
+        isSpiralStyle ? "bg-gradient-to-r from-blue-600 to-purple-600 border-blue-700" : "bg-background border-border"
       )}>
-        {/* Left side with new chat button and title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
+          {/* Left side - New Chat Button */}
           <button
             onClick={onNewChat}
             className={cn(
-              "flex items-center justify-center p-2 rounded-full",
-              isSpiralStyle 
-                ? "text-amber-400 hover:bg-blue-800" 
-                : "text-muted-foreground hover:bg-accent/10"
+              "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+              isSpiralStyle
+                ? "bg-white/20 text-white hover:bg-white/30"
+                : "bg-accent/20 text-foreground hover:bg-accent/40"
             )}
-            title="New Chat"
+            aria-label="New Chat"
           >
             <Plus className="h-5 w-5" />
           </button>
-
-          <div className="flex items-center">
+          
+          {/* Center - Chat Title with Edit functionality */}
+          <div className="flex-1 min-w-0">
             {isEditing ? (
-              <div className="flex items-center bg-muted/50 rounded-lg px-2">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleUpdateTitle();
+              }}>
                 <input
                   ref={inputRef}
+                  type="text"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
-                  onKeyDown={handleKeyDown}
                   className={cn(
-                    "bg-transparent border-none focus:outline-none py-1 text-sm font-medium",
-                    isSpiralStyle 
-                      ? "bg-blue-800 border-amber-400 text-white focus:outline-none focus:ring-1 focus:ring-amber-400" 
-                      : "bg-background border-input focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                    "w-full px-2 py-1 rounded border focus:outline-none focus:ring-2",
+                    isSpiralStyle
+                      ? "bg-white/10 border-white/20 text-white focus:ring-amber-400"
+                      : "bg-background border-input text-foreground focus:ring-primary"
                   )}
-                  placeholder="Chat title"
+                  onBlur={handleUpdateTitle}
+                  autoFocus
                 />
-                <button
-                  onClick={handleSaveTitle}
-                  className={cn(
-                    "p-1 text-green-500 hover:text-green-600",
-                    isSpiralStyle 
-                      ? "text-green-400 hover:bg-blue-800" 
-                      : "text-green-600 hover:bg-accent/10"
-                  )}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingTitle(chatTitle);
-                    setIsEditing(false);
-                  }}
-                  className={cn(
-                    "p-1 text-red-500 hover:text-red-600",
-                    isSpiralStyle 
-                      ? "text-amber-400 hover:bg-blue-800" 
-                      : "text-muted-foreground hover:bg-accent/10"
-                  )}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+              </form>
             ) : (
               <div className="flex items-center">
-                <h2 
+                <h1
                   className={cn(
-                    "text-lg font-semibold mr-2",
+                    "font-medium truncate cursor-pointer",
                     isSpiralStyle ? "text-white" : "text-foreground"
                   )}
                   onClick={() => setIsEditing(true)}
-                  style={{ cursor: 'pointer' }}
+                  title={chatTitle}
                 >
-                  {chatTitle || 'New Chat'}
-                </h2>
+                  {chatTitle}
+                </h1>
                 <button
                   onClick={() => setIsEditing(true)}
                   className={cn(
-                    "p-1 rounded opacity-60 hover:opacity-100",
-                    isSpiralStyle 
-                      ? "text-amber-400 hover:bg-blue-800" 
-                      : "text-muted-foreground hover:bg-accent/10"
+                    "ml-1.5 p-1 rounded-full opacity-60 hover:opacity-100",
+                    isSpiralStyle ? "text-white" : "text-muted-foreground"
                   )}
-                  title="Edit title"
                 >
                   <Edit2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Right side with mode dropdown and menu */}
-        <div className="flex items-center gap-3">
-          <ModeDropdown 
-            onSelect={handleModeChange} 
-            onOpenSettings={handleOpenAiSettings}
-            onCreateMode={handleCreateMode}
-            onCustomizeMode={handleCustomizeMode}
-          />
-
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className={cn(
-                "p-2 rounded-full",
-                isSpiralStyle 
-                  ? "text-amber-400 hover:bg-blue-800" 
-                  : "text-muted-foreground hover:bg-accent/10"
-              )}
-              title="More options"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </button>
-
-            {showMenu && (
-              <div className={cn(
-                "absolute right-0 mt-1 w-48 rounded-md shadow-lg z-10",
-                isSpiralStyle 
-                  ? "bg-white dark:bg-slate-900 border border-amber-400" 
-                  : "bg-background border border-border"
-              )}>
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      onSaveChat();
-                      setShowMenu(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm w-full text-left",
-                      isSpiralStyle 
-                        ? "hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-900 dark:text-amber-400" 
-                        : "hover:bg-accent/10 text-foreground"
-                    )}
-                  >
-                    {isSaved ? (
-                      <>
-                        <Trash className="h-4 w-4" />
-                        <span>Remove from Saved</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        <span>Save Chat</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onPinChat();
-                      setShowMenu(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm w-full text-left",
-                      isSpiralStyle 
-                        ? "hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-900 dark:text-amber-400" 
-                        : "hover:bg-accent/10 text-foreground"
-                    )}
-                  >
-                    {isPinned ? (
-                      <>
-                        <PinOff className="h-4 w-4" />
-                        <span>Unpin Chat</span>
-                      </>
-                    ) : (
-                      <>
-                        <Pin className="h-4 w-4" />
-                        <span>Pin Chat</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onShowExport();
-                      setShowMenu(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm w-full text-left",
-                      isSpiralStyle 
-                        ? "hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-900 dark:text-amber-400" 
-                        : "hover:bg-accent/10 text-foreground"
-                    )}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span>Export Chat</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onShowSettings();
-                      setShowMenu(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm w-full text-left",
-                      isSpiralStyle 
-                        ? "hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-900 dark:text-amber-400" 
-                        : "hover:bg-accent/10 text-foreground"
-                    )}
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>AI Settings</span>
-                  </button>
-
-                  <div className="border-t border-border my-1"></div>
-
-                  <button
-                    onClick={() => {
-                      onClearChat();
-                      setShowMenu(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm w-full text-left",
-                      isSpiralStyle 
-                        ? "hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400" 
-                        : "hover:bg-red-100/10 text-red-600"
-                    )}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Clear Chat</span>
-                  </button>
+          
+          {/* Right side - Mode selector and more actions */}
+          <div className="flex items-center gap-2">
+            {/* Mode Selector Dropdown */}
+            <ModeDropdown />
+            
+            {/* More Menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className={cn(
+                  "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+                  isSpiralStyle
+                    ? "bg-white/20 text-white hover:bg-white/30"
+                    : "bg-accent/20 text-foreground hover:bg-accent/40"
+                )}
+                aria-label="Menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              
+              {showMenu && (
+                <div className={cn(
+                  "absolute z-50 right-0 mt-1 w-48 rounded-md shadow-lg overflow-hidden",
+                  isSpiralStyle
+                    ? "bg-white dark:bg-slate-900 border border-amber-400"
+                    : "bg-background border border-border"
+                )}>
+                  <div className="py-1">
+                    {/* Clear chat button */}
+                    <button
+                      onClick={() => {
+                        onClearChat();
+                        setShowMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2 text-sm",
+                        isSpiralStyle
+                          ? "text-foreground hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      <span>Clear Chat</span>
+                    </button>
+                    
+                    {/* Save chat button */}
+                    <button
+                      onClick={() => {
+                        onSaveChat();
+                        setShowMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2 text-sm",
+                        isSpiralStyle
+                          ? "text-foreground hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      {isSaved ? (
+                        <>
+                          <Trash className="h-4 w-4 mr-2" />
+                          <span>Unsave Chat</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          <span>Save Chat</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Pin chat button */}
+                    <button
+                      onClick={() => {
+                        onPinChat();
+                        setShowMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2 text-sm",
+                        isSpiralStyle
+                          ? "text-foreground hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      {isPinned ? (
+                        <>
+                          <PinOff className="h-4 w-4 mr-2" />
+                          <span>Unpin Chat</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pin className="h-4 w-4 mr-2" />
+                          <span>Pin Chat</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* ExhibitExporterButton */}
+                    <div className="ml-1">
+                      <ExhibitExporterButton />
+                    </div>
+                    
+                    {/* Export chat button */}
+                    <button
+                      onClick={() => {
+                        onShowExport();
+                        setShowMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2 text-sm",
+                        isSpiralStyle
+                          ? "text-foreground hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      <span>Export Chat</span>
+                    </button>
+                    
+                    {/* Settings button */}
+                    <button
+                      onClick={() => {
+                        onShowSettings();
+                        setShowMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2 text-sm",
+                        isSpiralStyle
+                          ? "text-foreground hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          : "text-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      <span>Settings</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Modals */}
-      <Suspense fallback={
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      }>
-        {showAiSettings && (
-          <AiSettings 
-            isOpen={showAiSettings} 
-            onClose={() => setShowAiSettings(false)} 
-          />
-        )}
-        
-        {showModeCustomizer && selectedModeForCustomization && (
-          <ModeCustomizer 
-            mode={selectedModeForCustomization} 
+      </header>
+      
+      {/* Modal for AI Settings */}
+      {showAiSettings && (
+        <Suspense fallback={<div className="p-4 text-center">Loading settings...</div>}>
+          <AiSettings isOpen={showAiSettings} onClose={() => setShowAiSettings(false)} />
+        </Suspense>
+      )}
+      
+      {/* Modal for Mode Customization */}
+      {showModeCustomizer && selectedModeForCustomization && (
+        <Suspense fallback={<div className="p-4 text-center">Loading mode customizer...</div>}>
+          <ModeCustomizer
+            mode={selectedModeForCustomization}
             onClose={() => {
               setShowModeCustomizer(false);
               setSelectedModeForCustomization(null);
-            }} 
+            }}
           />
-        )}
-      </Suspense>
+        </Suspense>
+      )}
     </>
   );
 } 

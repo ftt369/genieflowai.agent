@@ -3,6 +3,8 @@ import MainLayout from './components/layout/MainLayout';
 import { useThemeStore } from './stores/theme/themeStore';
 import { useNotification } from './components/ui/Notification';
 import { Button } from './components/ui/button';
+import AppInit from './components/AppInit';
+import { ToastProvider } from './components/ui/toast';
 
 function App() {
   const { mode, profile, setMode, setProfile } = useThemeStore();
@@ -39,10 +41,11 @@ function App() {
   }, [profile]);
 
   return (
-    <>
+    <ToastProvider>
+      <AppInit />
       <MainLayout />
       <NotificationsContainer />
-    </>
+    </ToastProvider>
   );
 }
 

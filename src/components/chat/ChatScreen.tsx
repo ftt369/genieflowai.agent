@@ -45,7 +45,8 @@ import {
   User2,
   Plus,
   AlertTriangle,
-  Square
+  Square,
+  ExternalLink
 } from 'lucide-react';
 import type { ChatMessage as BaseChatMessage } from '@/types/chat';
 import { extractFileContent, createImageThumbnail, cleanupOCR } from '../../utils/fileUtils';
@@ -63,6 +64,8 @@ import Prism from 'prismjs';
 import CodeBlock from './CodeBlock';
 import { useAiAssistant } from '@/services/aiAssistantService';
 import { Toaster } from 'react-hot-toast';
+import Citations from './Citations';
+import { processCitationsInResponse, fetchCitationsForQuery } from '@/services/ai/citationService';
 
 // Extend the base ChatMessage type with additional properties
 interface ExtendedChatMessage extends Omit<BaseChatMessage, 'role'> {
@@ -680,6 +683,46 @@ export default function ChatScreen({
         }
       }
       
+      // After streaming is complete, process for citations
+      try {
+        // First check if we need to extract citations from the content
+        if (accumulatedContent.includes('[[citation:')) {
+          // Process citation markers in the content
+          const { processedContent, citations } = processCitationsInResponse(accumulatedContent);
+          
+          if (citations.length > 0) {
+            // Update message with processed content and citations
+            const finalMessage = {
+              ...assistantMessage,
+              content: processedContent,
+              citations
+            };
+            
+            // Update in the store
+            removeMessage(activeChat, assistantMessageId);
+            addMessage(activeChat, finalMessage);
+          }
+        }
+        // If no citation markers, get citations from web search
+        else if (currentChat?.settings?.chat?.webSearch) {
+          const citations = await fetchCitationsForQuery(currentQuery);
+          
+          if (citations.length > 0) {
+            // Update message with citations
+            const finalMessage = {
+              ...assistantMessage,
+              content: accumulatedContent,
+              citations
+            };
+            
+            // Update in the store
+            removeMessage(activeChat, assistantMessageId);
+            addMessage(activeChat, finalMessage);
+          }
+        }
+      } catch (citationError) {
+        console.error('Error processing citations:', citationError);
+      }
     } catch (error: any) {
       console.error('Error in chat:', error);
       setNotifications(prev => [...prev, {
@@ -1142,6 +1185,11 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
     if (files.length === 0) return;
 
     console.log(`Processing ${files.length} files from drop`);
+    // Log each file's details to debug issues
+    files.forEach(file => {
+      console.log(`File: ${file.name}, Type: ${file.type}, Size: ${file.size} bytes`);
+    });
+
     const newAttachments: Attachment[] = [];
     const errors: string[] = [];
     const notificationId = generateUUID();
@@ -1163,11 +1211,22 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
           continue;
         }
 
-        // Determine file type
-        const type = Object.entries(ALLOWED_FILE_TYPES).find(([_, types]) => 
-          types.includes(file.type)
-        )?.[0] as Attachment['type'] || 'document';
+        // Fix for Word documents with missing MIME type
+        let fileType = file.type;
+        if (!fileType && file.name.endsWith('.docx')) {
+          fileType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          console.log(`File type missing, assuming ${fileType} based on extension`);
+        } else if (!fileType && file.name.endsWith('.doc')) {
+          fileType = 'application/msword';
+          console.log(`File type missing, assuming ${fileType} based on extension`);
+        }
+
+        // Determine file type with better fallback
+        const fileTypeEntry = Object.entries(ALLOWED_FILE_TYPES).find(([_, types]) => 
+          types.includes(fileType)
+        );
         
+        const type = fileTypeEntry?.[0] as Attachment['type'] || 'document';
         console.log(`Determined file type: ${type}`);
 
         // Read file content using our improved utility
@@ -1186,7 +1245,7 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
           url,
           thumbnailUrl,
           size: file.size,
-          mimeType: file.type,
+          mimeType: fileType, // Use our fixed mime type
           content // Store the content for processing
         };
 
@@ -1916,13 +1975,16 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                     
                     <div className="text-gray-800 dark:text-gray-200">
                       {renderMessageContent(message.content)}
-                          </div>
-                  </div>
+                      {message.citations && message.citations.length > 0 && (
+                        <Citations citations={message.citations} />
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
               </div>
+            </div>
+          ))}
+                </div>
+                )}
+                </div>
 
         {/* Chat input */}
         <div className="border-t p-2 bg-background">

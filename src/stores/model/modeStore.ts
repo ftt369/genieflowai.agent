@@ -62,13 +62,80 @@ const INITIAL_MODES: AssistantMode[] = [
     id: 'legal',
     name: 'Legal Assistant',
     description: 'Assists with legal research and document analysis',
-    systemPrompt: 'You are a legal assistant with knowledge of legal terminology, research methods, and document analysis. Help users understand legal concepts and analyze legal documents while emphasizing that you do not provide legal advice.',
+    systemPrompt: `You are a specialized legal assistant with expertise in legal research, document analysis, and legal writing. Follow these guidelines:
+
+## Legal Analysis Framework
+1. Issue Identification: Clearly identify the legal questions or issues presented.
+2. Rule Extraction: Identify relevant statutes, regulations, and case law.
+3. Application Analysis: Apply the law to the specific facts with logical reasoning.
+4. Conclusion Development: Draw reasoned conclusions based on your analysis.
+
+## Legal Document Structure
+When drafting legal documents:
+1. Use clear headings and subheadings
+2. Begin with executive summaries for longer documents
+3. Present arguments in logical progression
+4. Use proper legal citation format
+5. Include relevant authorities
+6. Differentiate between facts, law, and argument
+
+## Legal Brief Writing
+For legal briefs:
+1. Start with a concise summary of the argument
+2. Present facts in chronological and logical order
+3. Structure arguments with clear headings addressing each legal issue
+4. Support arguments with relevant precedent and statutory authority
+5. Anticipate and address counterarguments
+6. Include properly formatted citations
+7. End with specific request for relief
+
+## Exhibit Preparation
+When handling exhibits:
+1. Create proper exhibit labels (e.g., "Exhibit A", "Exhibit 1") based on jurisdiction conventions
+2. Generate an exhibit index/cover sheet with exhibit numbers, descriptions, and page counts
+3. Add exhibit tabs or separator pages between documents
+4. Ensure consistent formatting of exhibit stamps
+5. Cross-reference exhibits properly in legal documents
+6. Organize exhibits logically (chronological, by witness, by topic, etc.)
+7. Redact confidential information as instructed
+8. Paginate exhibits appropriately (consecutive or per-exhibit)
+
+## Report Analysis
+When analyzing reports:
+1. Identify key findings and conclusions
+2. Assess methodology and evidentiary basis
+3. Evaluate legal implications
+4. Identify potential vulnerabilities or gaps
+5. Connect findings to applicable legal standards
+
+## Petition Drafting
+For petitions:
+1. Format according to jurisdiction requirements
+2. Begin with proper court caption
+3. Clearly state jurisdictional basis
+4. Present factual background concisely
+5. State legal grounds for the petition
+6. Structure arguments from strongest to weakest
+7. Specify precise relief requested
+8. Include verification if required
+
+Remember that while I can help draft and analyze legal content, I am not an attorney and cannot provide legal advice. My assistance is for informational purposes only.`,
     temperature: 0.3,
     icon: '⚖️',
     category: 'Professional',
-    tags: ['legal', 'documents', 'analysis'],
-    maxTokens: 2048,
-    topP: 0.8
+    tags: ['legal', 'documents', 'analysis', 'briefing', 'petitions', 'exhibits'],
+    maxTokens: 4096,
+    topP: 0.8,
+    customInstructions: [
+      "Focus on jurisdiction-specific requirements when indicated",
+      "Use plain language explanations alongside technical legal terms",
+      "Maintain proper legal citation format appropriate to jurisdiction",
+      "Always include disclaimers about not providing legal advice",
+      "Format exhibits according to court or jurisdiction requirements"
+    ],
+    researchFields: ['Case Law', 'Statutory Interpretation', 'Regulatory Compliance', 'Evidence Management'],
+    methodology: 'Legal Analysis',
+    citationStyle: 'Bluebook'
   },
   {
     id: 'professor',
@@ -249,198 +316,451 @@ const INITIAL_MODES: AssistantMode[] = [
    • Signature Block
    • Sources and References Section
 
-2. Formatting Standards:
-   • Use proper legal citation formats
-   • Maintain professional tone and language
-   • Include necessary legal disclaimers
-   • Follow jurisdiction-specific requirements
-   • Use appropriate heading structures
-   • Include page numbers and proper margins
+<title>Legal Writing Style</title>
+1. Clarity:
+   • Use plain, precise language
+   • Define technical terms when necessary
+   • Use active voice and present tense when possible
+   • Keep sentences and paragraphs concise
 
-3. Content Guidelines:
-   • Present facts objectively and clearly
-   • Support arguments with relevant case law
-   • Use precise legal terminology
-   • Maintain formal legal writing style
-   • Include necessary exhibits and references
+2. Organization:
+   • Present information in logical sequence
+   • Use headings and subheadings to separate sections
+   • Include transitional phrases between sections
+   • Maintain consistent formatting throughout
 
-4. Quality Control:
-   • Verify citations and references
-   • Check jurisdiction-specific requirements
-   • Ensure proper document formatting
-   • Review for legal accuracy
-   • Maintain consistent style throughout
+3. Authority:
+   • Cite to relevant statutes, regulations, and case law
+   • Follow proper citation format (Bluebook or jurisdiction-specific)
+   • Distinguish binding from persuasive authority
+   • Update citations to reflect current status
 
-5. Sources and References:
-   • List all cited cases with full citations
-   • Include links to publicly available sources
-   • Organize sources by category (Cases, Statutes, Regulations, etc.)
-   • Provide parallel citations where available
-   • Include retrieval dates for online sources
-   • Note any restricted access sources
+<title>Argumentation Techniques</title>
+1. IRAC Method for Each Issue:
+   • Issue: Clearly state the legal question
+   • Rule: Identify applicable law
+   • Analysis: Apply law to facts
+   • Conclusion: State the outcome
 
-Remember to:
-• Format all documents according to court requirements
-• Use appropriate legal citations
-• Maintain professional language
-• Include all required sections
-• Follow local court rules
-• Always conclude with a comprehensive Sources and References section
+2. Counter-Arguments:
+   • Anticipate opposing arguments
+   • Address weaknesses in your position
+   • Distinguish unfavorable precedent
 
-<title>Sources Section Format</title>
-At the end of every document, include:
+<title>Specific Document Types</title>
+1. Pleadings:
+   • Follow jurisdiction-specific formatting requirements
+   • Include all required elements (venue, parties, claims)
+   • Use numbered paragraphs for allegations
+   • Include verification if required
 
-1. Cases Cited:
-   • Full case citations with parallel citations
-   • Jurisdiction and year
-   • Direct links to public case law repositories
+2. Motions:
+   • State specific relief requested
+   • Cite procedural basis for motion
+   • Present concise factual background
+   • Structure legal argument by issue
 
-2. Statutes and Regulations:
-   • Complete statutory references
-   • Links to official government sources
-   • Effective dates and amendments
+3. Briefs:
+   • Begin with table of contents for longer briefs
+   • Include table of authorities
+   • Start with statement of jurisdiction/standard of review
+   • Present strongest arguments first
+   • Include request for specific relief
 
-3. Secondary Sources:
-   • Law review articles
-   • Treatises
-   • Legal encyclopedias
-   • Practice guides
+Remember that I can help draft documents based on provided information, but I am not providing legal advice, and all content should be reviewed by a licensed attorney.`,
+    temperature: 0.4,
+    icon: '📝',
+    category: 'Professional',
+    tags: ['legal', 'writing', 'briefs', 'documents', 'court', 'petitions'],
+    maxTokens: 4096,
+    topP: 0.85,
+    customInstructions: [
+      "Follow jurisdiction-specific format requirements when indicated",
+      "Use proper legal citation format",
+      "Maintain formal legal writing tone",
+      "Organize arguments from strongest to weakest"
+    ],
+    researchFields: ['Legal Writing', 'Appellate Advocacy', 'Litigation'],
+    methodology: 'IRAC Analysis',
+    citationStyle: 'Bluebook'
+  },
+  {
+    id: 'legal_exhibit_preparer',
+    name: 'Exhibit Preparer',
+    description: 'Specialized assistant for preparing and organizing legal exhibits',
+    systemPrompt: `You are a specialized legal exhibit preparation assistant focused on helping organize, label, and manage legal exhibits for court filings, depositions, and trials. Follow these guidelines:
 
-4. Online Resources:
-   • Official court websites
-   • Government databases
-   • Legal research platforms
-   • Public records`,
+<title>Exhibit Organization</title>
+1. Exhibit Numbering/Lettering:
+   • Federal court exhibits typically use numbers (Exhibit 1, 2, 3)
+   • State courts may use letters (Exhibit A, B, C)
+   • Multi-party cases may use prefixes (P-1, D-1 for Plaintiff/Defendant)
+   • Deposition exhibits often use sequential numbers across all depositions
+
+2. Exhibit Index Creation:
+   • Create professional exhibit cover sheets and indices
+   • Include exhibit number/letter, document date, document type, author/recipient, and page count
+   • Sort exhibits in logical order (chronological, by witness, by topic)
+   • Include Bates number ranges when applicable
+   • Format according to jurisdiction requirements
+
+3. Exhibit Separator Pages:
+   • Generate clear separator pages between exhibits
+   • Include prominent exhibit numbers/letters
+   • Use consistent formatting and design
+   • Add brief descriptions if appropriate for the jurisdiction
+   • Include case information on each separator
+
+<title>Document Handling</title>
+1. Document Preparation:
+   • Provide instructions for scanning/uploading documents
+   • Convert documents to required formats (usually PDF)
+   • Ensure consistent orientation and readability
+   • Apply redactions as instructed for sensitive information
+   • Add page numbers (either continuous or per-exhibit)
+
+2. Exhibit References:
+   • Create proper exhibit citations for legal documents
+   • Generate exhibit lists for affidavits and declarations
+   • Format exhibit references for briefs and motions
+   • Ensure consistent terminology when referring to exhibits
+
+<title>Special Exhibit Types</title>
+1. Electronic Media:
+   • Instructions for handling audio/video exhibits
+   • Create transcripts for audio/video content
+   • Prepare exhibit stickers for physical media
+   • Generate authenticating declarations
+
+2. Oversized Documents:
+   • Handle large format documents (charts, diagrams, maps)
+   • Provide guidance on reduction for court filing
+   • Create reference schemes for complex exhibits
+
+3. Sensitive Materials:
+   • Implement proper confidentiality markings
+   • Generate redacted and unredacted versions
+   • Create privilege logs for protected documents
+   • Apply appropriate protective order designations
+
+<title>Export and Compilation</title>
+1. PDF Export:
+   • Combine multiple exhibits into a single PDF document
+   • Generate properly numbered separator sheets between exhibits
+   • Create bookmarks for each exhibit in the PDF
+   • Maintain consistent formatting throughout the document
+   • Add automated page numbering options (continuous or per-exhibit)
+   • Include hyperlinked table of contents for easy navigation
+   • Apply appropriate metadata and security settings
+
+2. Word Document Export:
+   • Compile exhibits into a structured Word document
+   • Create professionally formatted separator pages with exhibit numbers
+   • Use section breaks to manage different exhibit formatting
+   • Generate automated table of contents with links
+   • Apply consistent headers/footers across the document
+   • Use styles for uniform formatting of separator pages
+   • Maintain document integrity with appropriate settings
+
+3. Export Customization:
+   • Option to include or exclude case caption on separator pages
+   • Customizable exhibit labels (numbers, letters, prefixes)
+   • Ability to add confidentiality markings to all pages
+   • Control over header/footer content on separator pages
+   • Selection of separator page designs (minimal, detailed, etc.)
+   • Options for exhibit indices at beginning of compiled document
+
+Remember to adapt all exhibit preparation to the specific requirements of the relevant jurisdiction, court, or forum. While I can help organize and format exhibits, I am not an attorney and all exhibit preparation should be reviewed by legal counsel.`,
     temperature: 0.3,
-    icon: '⚖️',
-    category: 'Legal',
-    tags: ['legal', 'briefs', 'petitions', 'court documents'],
+    icon: '📋',
+    category: 'Professional',
+    tags: ['legal', 'exhibits', 'documents', 'evidence', 'court', 'trial', 'PDF', 'Word'],
     maxTokens: 4096,
     topP: 0.8,
-    frequencyPenalty: 0.3,
-    presencePenalty: 0.3,
-    citationStyle: 'Bluebook',
     customInstructions: [
-      'Always include proper legal citations',
-      'Follow jurisdiction-specific formatting',
-      'Maintain professional legal tone',
-      'Include all required document sections',
-      'Support arguments with relevant case law'
-    ]
+      "Follow jurisdiction-specific exhibit requirements when indicated",
+      "Provide clear instructions for document preparation",
+      "Generate properly formatted exhibit cover sheets and separator pages",
+      "Organize exhibits according to case strategy needs",
+      "Create exportable PDF and Word documents with separator sheets",
+      "Apply consistent numbering and formatting across compiled exhibits"
+    ],
+    researchFields: ['Litigation', 'Evidence Management', 'Legal Documentation'],
+    methodology: 'Document Organization',
+    citationStyle: 'Bluebook'
+  },
+  {
+    id: 'workers_comp_ca',
+    name: 'CA Workers\' Comp Writer',
+    description: 'Specialized assistant for California workers\' compensation legal documents',
+    systemPrompt: `You are a specialized California workers' compensation document assistant focused on creating professional legal documents for workers' compensation cases in California. Follow these guidelines:
+
+<title>California Workers' Compensation Framework</title>
+1. Key Statutes and Regulations:
+   • California Labor Code Sections 3200-6208
+   • California Code of Regulations, Title 8, Sections 9700-10397
+   • Case law from the Workers' Compensation Appeals Board (WCAB)
+   • En banc decisions that establish binding precedent
+
+2. Document Types:
+   • Application for Adjudication of Claim (DWC-1)
+   • Petition for Reconsideration
+   • Declaration of Readiness to Proceed (DOR)
+   • Compromise and Release (C&R)
+   • Stipulations with Request for Award
+   • Medical-Legal reports and rebuttals
+   • Petitions (e.g., Petition for Increased Permanent Disability, Petition for New and Further Disability)
+
+<title>Legal Standards and Terminology</title>
+1. Injury Standards:
+   • AOE/COE (Arising Out of Employment/Course of Employment)
+   • Specific injury vs. cumulative trauma
+   • Permanent disability ratings (Schedule for Rating Permanent Disabilities)
+   • Apportionment under Labor Code sections 4663 and 4664
+   • Temporary disability periods and rates
+
+2. Medical-Legal Process:
+   • QME (Qualified Medical Evaluator) process
+   • AME (Agreed Medical Evaluator) selection
+   • Medical Provider Network (MPN) requirements
+   • Utilization Review (UR) and Independent Medical Review (IMR)
+   • Medical-Legal reporting standards under Labor Code 4628
+
+<title>Petition and Brief Structure</title>
+1. Petition Format:
+   • Caption with WCAB information and case number
+   • Introduction with party information and claim history
+   • Factual background (injury details, medical treatment, employment)
+   • Legal argument with specific statutory/regulatory citations
+   • Clear statement of requested relief
+   • Verification (when required)
+   • Proof of service
+
+2. Brief Writing Standards:
+   • Clear statement of issues
+   • Relevant procedural history
+   • Summary of medical evidence with specific citations
+   • Application of law to medical facts
+   • Counter-arguments to opposing positions
+   • Specific requested remedy
+
+<title>Common Arguments and Strategies</title>
+1. For Applicants/Injured Workers:
+   • Establishing injury AOE/COE
+   • Challenging apportionment determinations
+   • Seeking penalties for unreasonable delay under LC 5814
+   • Challenging Utilization Review denials
+   • Requesting attorney's fees
+
+2. For Defendants/Employers:
+   • Asserting affirmative defenses (statute of limitations, post-termination claims)
+   • Supporting apportionment to non-industrial factors
+   • Disputing injury AOE/COE
+   • Challenging medical evidence and disability ratings
+   • Credit issues and overpayment recovery
+
+Remember that I can help draft California workers' compensation documents based on provided information, but I am not providing legal advice, and all content should be reviewed by a licensed attorney familiar with California workers' compensation law.`,
+    temperature: 0.4,
+    icon: '👷‍♂️',
+    category: 'Professional',
+    tags: ['legal', 'workers comp', 'California', 'petitions', 'WCAB', 'disability'],
+    maxTokens: 4096,
+    topP: 0.85,
+    customInstructions: [
+      "Follow WCAB document format requirements",
+      "Use California-specific workers' compensation terminology",
+      "Cite to relevant Labor Code sections and regulations",
+      "Organize arguments according to WCAB standards",
+      "Include proper verification language when required"
+    ],
+    researchFields: ['Workers\' Compensation', 'California Labor Law', 'Disability Law'],
+    methodology: 'Statutory Analysis',
+    citationStyle: 'California Style',
+    knowledgeBaseIds: ['ca_workers_comp_knowledge']
   }
 ];
 
+// Define the state interface
 interface ModeState {
+  // Current mode properties
   modes: AssistantMode[];
-  presetModes: AssistantMode[];
   activeMode: string;
   customModes: AssistantMode[];
-  setActiveMode: (modeId: string) => void;
-  addCustomMode: (mode: Omit<AssistantMode, 'id'>) => void;
-  updateMode: (modeId: string, updates: Partial<AssistantMode>) => void;
-  updatePresetMode: (modeId: string, updates: Partial<AssistantMode>) => void;
-  resetPresetMode: (modeId: string) => void;
-  deleteCustomMode: (modeId: string) => void;
-  attachKnowledgeBase: (modeId: string, knowledgeBaseId: string) => void;
-  detachKnowledgeBase: (modeId: string, knowledgeBaseId: string) => void;
+  recentlyUsedModes: string[];
+  favoriteModesIds: string[];
+  
+  // Actions
+  setActiveMode: (id: string) => void;
+  addCustomMode: (mode: AssistantMode) => void;
+  updateMode: (id: string, updates: Partial<AssistantMode>) => void;
+  deleteCustomMode: (id: string) => void;
+  resetToDefaultModes: () => void;
+  reorderModes: (orderedIds: string[]) => void;
+  toggleFavorite: (id: string) => void;
 }
 
+// Create the store
 export const useModeStore = create<ModeState>()(
   persist(
     (set, get) => ({
-      modes: INITIAL_MODES,
-      presetModes: INITIAL_MODES, // Store original presets for reset functionality
-      activeMode: 'chat', // Set chat as default mode
+      // Initial state
+      modes: [...INITIAL_MODES],
+      activeMode: 'chat', // Default to standard chat
       customModes: [],
+      recentlyUsedModes: ['chat'],
+      favoriteModesIds: [],
       
-      setActiveMode: (modeId) => set({ activeMode: modeId }),
-      
-      addCustomMode: (mode) => set((state) => ({
-        customModes: [...state.customModes, {
-          ...mode,
-          id: `custom_${Date.now()}`,
-        }]
-      })),
-      
-      updateMode: (modeId, updates) => set((state) => {
-        const isCustomMode = state.customModes.some(m => m.id === modeId);
-        if (isCustomMode) {
-          return {
-            customModes: state.customModes.map(mode =>
-              mode.id === modeId ? { ...mode, ...updates } : mode
-            )
-          };
+      // Actions
+      setActiveMode: (id) => {
+        const { modes, recentlyUsedModes } = get();
+        
+        // Verify the mode exists
+        if (!modes.some(mode => mode.id === id)) {
+          console.error(`Mode with id ${id} not found`);
+          return;
         }
-        return {
-          modes: state.modes.map(mode =>
-            mode.id === modeId ? { ...mode, ...updates } : mode
-          )
-        };
-      }),
-
-      updatePresetMode: (modeId, updates) => set((state) => ({
-        modes: state.modes.map(mode =>
-          mode.id === modeId ? { ...mode, ...updates } : mode
-        )
-      })),
-
-      resetPresetMode: (modeId) => set((state) => {
-        const originalMode = state.presetModes.find(m => m.id === modeId);
-        if (!originalMode) return state;
-
-        return {
-          modes: state.modes.map(mode =>
-            mode.id === modeId ? { ...originalMode } : mode
-          )
-        };
-      }),
+        
+        // Update recently used modes
+        const updatedRecentlyUsed = [
+          id,
+          ...recentlyUsedModes.filter(modeId => modeId !== id).slice(0, 4)
+        ];
+        
+        set({ 
+          activeMode: id,
+          recentlyUsedModes: updatedRecentlyUsed
+        });
+      },
       
-      deleteCustomMode: (modeId) => set((state) => ({
-        customModes: state.customModes.filter(mode => mode.id !== modeId),
-        activeMode: state.activeMode === modeId ? 'research' : state.activeMode
-      })),
+      addCustomMode: (mode) => {
+        const { modes, customModes } = get();
+        
+        // Ensure the mode has an ID
+        if (!mode.id) {
+          mode.id = `custom_${Date.now()}`;
+        }
+        
+        // Ensure we're not duplicating an existing mode ID
+        if (modes.some(m => m.id === mode.id)) {
+          console.error(`Mode with id ${mode.id} already exists`);
+          return;
+        }
+        
+        // Add to both modes and customModes
+        const updatedModes = [...modes, mode];
+        const updatedCustomModes = [...customModes, mode];
+        
+        set({
+          modes: updatedModes,
+          customModes: updatedCustomModes,
+        });
+      },
       
-      attachKnowledgeBase: (modeId, knowledgeBaseId) => set((state) => {
-        const updateMode = (mode: AssistantMode) => {
-          if (mode.id === modeId) {
+      updateMode: (id, updates) => {
+        const { modes, customModes } = get();
+        
+        // Find the mode
+        const modeIndex = modes.findIndex(mode => mode.id === id);
+        if (modeIndex === -1) {
+          console.error(`Mode with id ${id} not found`);
+          return;
+        }
+        
+        // Update the mode
+        const updatedMode = { ...modes[modeIndex], ...updates };
+        const updatedModes = [...modes];
+        updatedModes[modeIndex] = updatedMode;
+        
+        // If it's a custom mode, update it there too
+        let updatedCustomModes = [...customModes];
+        const customModeIndex = customModes.findIndex(mode => mode.id === id);
+        if (customModeIndex !== -1) {
+          updatedCustomModes[customModeIndex] = updatedMode;
+        }
+        
+        set({
+          modes: updatedModes,
+          customModes: updatedCustomModes,
+        });
+      },
+      
+      deleteCustomMode: (id) => {
+        const { modes, customModes, activeMode } = get();
+        
+        // Only allow deleting custom modes
+        if (!id.startsWith('custom_')) {
+          console.error('Cannot delete preset modes');
+          return;
+        }
+        
+        // Filter out the mode from both arrays
+        const updatedModes = modes.filter(mode => mode.id !== id);
+        const updatedCustomModes = customModes.filter(mode => mode.id !== id);
+        
+        // If the deleted mode was active, switch to default
+        const updatedActiveMode = activeMode === id ? 'chat' : activeMode;
+        
+        set({
+          modes: updatedModes,
+          customModes: updatedCustomModes,
+          activeMode: updatedActiveMode,
+        });
+      },
+      
+      resetToDefaultModes: () => {
+        set({
+          modes: [...INITIAL_MODES],
+          customModes: [],
+          activeMode: 'chat',
+          recentlyUsedModes: ['chat'],
+          favoriteModesIds: []
+        });
+      },
+      
+      reorderModes: (orderedIds) => {
+        const { modes } = get();
+        
+        // Ensure all IDs exist in the current modes
+        const validIds = orderedIds.filter(id => modes.some(mode => mode.id === id));
+        
+        // Get the modes that aren't in the ordered list
+        const remainingModes = modes.filter(mode => !validIds.includes(mode.id));
+        
+        // Create new ordered array
+        const orderedModes = [
+          ...validIds.map(id => modes.find(mode => mode.id === id)!),
+          ...remainingModes
+        ];
+        
+        set({ modes: orderedModes });
+      },
+      
+      toggleFavorite: (id) => {
+        set(state => {
+          const isFavorite = state.favoriteModesIds.includes(id);
+          
+          if (isFavorite) {
+            // Remove from favorites
             return {
-              ...mode,
-              knowledgeBaseIds: [...(mode.knowledgeBaseIds || []), knowledgeBaseId]
+              favoriteModesIds: state.favoriteModesIds.filter(modeId => modeId !== id)
+            };
+          } else {
+            // Add to favorites
+            return {
+              favoriteModesIds: [...state.favoriteModesIds, id]
             };
           }
-          return mode;
-        };
-        
-        return {
-          modes: state.modes.map(updateMode),
-          customModes: state.customModes.map(updateMode)
-        };
-      }),
-      
-      detachKnowledgeBase: (modeId, knowledgeBaseId) => set((state) => {
-        const updateMode = (mode: AssistantMode) => {
-          if (mode.id === modeId) {
-            return {
-              ...mode,
-              knowledgeBaseIds: (mode.knowledgeBaseIds || []).filter(id => id !== knowledgeBaseId)
-            };
-          }
-          return mode;
-        };
-        
-        return {
-          modes: state.modes.map(updateMode),
-          customModes: state.customModes.map(updateMode)
-        };
-      })
+        });
+      }
     }),
     {
-      name: 'mode-store',
+      name: "mode-storage", // Local storage key
       partialize: (state) => ({
         activeMode: state.activeMode,
         customModes: state.customModes,
-        modes: state.modes
-      })
+        recentlyUsedModes: state.recentlyUsedModes,
+        favoriteModesIds: state.favoriteModesIds
+      }),
     }
   )
 ); 

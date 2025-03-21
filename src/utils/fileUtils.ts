@@ -268,9 +268,56 @@ async function readTextFile(file: File): Promise<string> {
 }
 
 async function extractOfficeContent(file: File): Promise<string> {
-  // For now, return a message that Office documents are not supported
-  // In a future update, we can add support for Office documents using appropriate libraries
-  return 'Office document content extraction is not yet supported. Please convert to PDF for better results.';
+  try {
+    // Check if it's a Word document
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    console.log(`Processing Office document: ${file.name}, type: ${file.type}, extension: ${fileExt}`);
+    
+    if (file.type.includes('word') || fileExt === 'doc' || fileExt === 'docx') {
+      console.log(`Extracting content from Word document: ${file.name}...`);
+      
+      // Check for older .doc format which isn't supported by mammoth
+      if (fileExt === 'doc') {
+        console.warn('Old .doc format detected - mammoth only supports .docx format');
+        return `This file (${file.name}) appears to be in the older .doc format which cannot be processed directly. Please convert it to .docx format and try again.`;
+      }
+      
+      const arrayBuffer = await file.arrayBuffer();
+      console.log(`File loaded as ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
+      
+      try {
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        console.log(`Mammoth extraction result, length: ${result.value.length} characters`);
+        
+        if (result.value.length === 0) {
+          console.warn('Extracted content is empty, document may be corrupted or protected');
+          return `Failed to extract content from ${file.name}. The document may be password-protected or corrupted.`;
+        }
+        
+        if (result.value.length < 100 && result.messages && result.messages.length > 0) {
+          console.warn('Extracted content is very short, checking mammoth messages:', result.messages);
+        }
+        
+        return result.value || `No text content could be extracted from ${file.name}`;
+      } catch (mammothError: any) {
+        console.error('Mammoth extraction error:', mammothError);
+        
+        // Check for common errors
+        if (mammothError.message && mammothError.message.includes('Could not find main document part')) {
+          return `This document appears to be in the older .doc format which cannot be processed directly. Please convert it to .docx format using Microsoft Word or an online converter and try again.`;
+        }
+        
+        return `Could not process Word document: ${mammothError.message || 'Unknown error'}. The file may be password-protected or in an unsupported format.`;
+      }
+    }
+    
+    // For other Office documents, return message
+    return `Office document type "${file.type}" extraction is not yet fully supported. Word documents (.docx only) should work. For other formats, please convert to PDF or .docx for better results.`;
+  } catch (error: any) {
+    console.error('Error extracting Office document content:', error);
+    return `Failed to extract content from Office document: ${error.message}. Please try converting to PDF or .docx format.`;
+  }
 }
 
 /**
@@ -360,25 +407,6 @@ export async function cleanupOCR() {
   }
 }
 
-// Function to extract content from a DOC/DOCX file
-async function extractDocContent(file: File): Promise<string> {
-  try {
-    console.log(`Extracting content from ${file.name} using mammoth...`);
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    console.log(`Mammoth extraction result, length: ${result.value.length} characters`);
-    
-    if (result.value.length < 100) {
-      console.warn('Extracted content is very short, document may be corrupted or protected');
-    }
-    
-    return result.value;
-  } catch (error: any) {
-    console.error('Error extracting DOC content:', error);
-    throw new Error(`Failed to extract content from DOC file: ${error.message}`);
-  }
-}
-
 // Main function to process different file types
 export async function processFile(file: File) {
   try {
@@ -412,8 +440,8 @@ export async function processFile(file: File) {
       console.log(`Determined file type: ${fileType}`);
       console.log(`Extracting content from ${file.name}...`);
       
-      // Use mammoth for DOC/DOCX extraction
-      content = await extractDocContent(file);
+      // Use Office content extraction
+      content = await extractOfficeContent(file);
       
       console.log(`Content extracted, length: ${content.length} characters`);
     } 
@@ -450,4 +478,4 @@ export async function processFile(file: File) {
       message: `Error processing file: ${error.message}`
     };
   }
-} 
+}

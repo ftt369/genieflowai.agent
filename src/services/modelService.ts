@@ -214,7 +214,38 @@ export class GeminiService implements ModelService {
       }
 
       // Format messages for the API and make the call
-      return await this.model.generateChat(validMessages);
+      // return await this.model.generateChat(validMessages);
+      
+      // Format messages for the Gemini API
+      const formattedMessages = validMessages.map(message => {
+        return {
+          role: message.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: message.content }]
+        };
+      });
+      
+      // Create chat instance
+      const chat = this.model.startChat({
+        generationConfig: {
+          temperature: this.config.temperature || 0.7,
+          maxOutputTokens: this.config.maxTokens || 8192,
+          topK: 40,
+          topP: 0.95,
+        }
+      });
+      
+      // Get the last message from user
+      const lastMessage = formattedMessages[formattedMessages.length - 1];
+      const history = formattedMessages.slice(0, -1);
+      
+      // Send the message
+      const result = await chat.sendMessage(lastMessage.parts[0].text, { history });
+      
+      if (!result.response) {
+        throw new Error('No response from Gemini API');
+      }
+      
+      return result.response.text();
     } catch (error) {
       console.error('Gemini API Error:', error);
       throw error;
@@ -256,14 +287,14 @@ export class GeminiService implements ModelService {
         }
         
         const enhancedMessages = validMessages.map(msg => {
-          if (msg.role === 'system') {
-            return {
-              role: 'user',
-              content: `[System Instruction] ${msg.content}`
-            };
-          }
-          return msg;
-        });
+        if (msg.role === 'system') {
+          return {
+            role: 'user',
+            content: `[System Instruction] ${msg.content}`
+          };
+        }
+        return msg;
+      });
 
         // If there's a current document, prepend it to the messages
         let messageHistory = [...enhancedMessages];
@@ -359,38 +390,38 @@ IMPORTANT INSTRUCTIONS:
         // For conversations, use chat
         const chat = this.model.startChat({
           history: chatHistory
-        });
-        
-        // Send the last message and get the streaming response
+      });
+      
+      // Send the last message and get the streaming response
         const lastMessage = messageHistory[messageHistory.length - 1];
         if (!lastMessage || !lastMessage.content.trim()) {
           throw new Error('No valid message content to process');
         }
 
         console.log(`Sending message to Gemini: ${lastMessage.content.substring(0, 150)}...`);
-        const streamingResponse = await chat.sendMessageStream(lastMessage.content);
-        
-        let fullResponse = '';
+      const streamingResponse = await chat.sendMessageStream(lastMessage.content);
+      
+      let fullResponse = '';
         try {
-          for await (const chunk of streamingResponse.stream) {
-            if (chunk.text) {
-              const text = chunk.text();
-              fullResponse += text;
-              yield text;
-            }
-          }
-          
-          // Check if response was cut off and continue if needed
-          if (fullResponse.endsWith('...') || fullResponse.endsWith('…') || !fullResponse.trim().endsWith('.')) {
-            console.log('Response appears to be cut off, attempting to continue...');
+      for await (const chunk of streamingResponse.stream) {
+        if (chunk.text) {
+          const text = chunk.text();
+          fullResponse += text;
+          yield text;
+        }
+      }
+
+      // Check if response was cut off and continue if needed
+      if (fullResponse.endsWith('...') || fullResponse.endsWith('…') || !fullResponse.trim().endsWith('.')) {
+        console.log('Response appears to be cut off, attempting to continue...');
             try {
-              const continuationResponse = await chat.sendMessageStream('Please continue your previous response.');
-              for await (const chunk of continuationResponse.stream) {
-                if (chunk.text) {
-                  const text = chunk.text();
-                  yield text;
-                }
-              }
+        const continuationResponse = await chat.sendMessageStream('Please continue your previous response.');
+        for await (const chunk of continuationResponse.stream) {
+          if (chunk.text) {
+            const text = chunk.text();
+            yield text;
+          }
+        }
             } catch (continuationError) {
               console.warn('Failed to get continuation, but returning partial response:', continuationError);
             }
@@ -434,34 +465,56 @@ IMPORTANT INSTRUCTIONS:
     return 'gemini-2.0-flash';
   }
 
+  /**
+   * Extract important keywords from a message for context relevance
+   * @param message The message to extract keywords from
+   * @returns Array of keywords
+   */
   private extractKeywords(message: string): string[] {
-    // Remove common words and punctuation
-    const stopWords = ['a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'about', 'like', 
-                       'through', 'over', 'before', 'between', 'after', 'since', 'without', 'under', 'within', 'along', 'following',
-                       'across', 'behind', 'beyond', 'plus', 'except', 'but', 'up', 'out', 'around', 'down', 'off', 'above', 'near'];
+    if (!message) return [];
     
-    const cleaned = message.toLowerCase()
-      .replace(/[^\w\s]/g, ' ')  // Replace punctuation with spaces
-      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-      .trim();
+    // Tokenize the message
+    const tokens = message.toLowerCase().split(/\s+/);
     
-    // Split into words and filter out short words and stop words
-    const words = cleaned.split(' ').filter(word => 
-      word.length > 3 && !stopWords.includes(word)
+    // Common words to exclude
+    const stopWords = new Set([
+      'a', 'an', 'the', 'and', 'or', 'but', 'for', 'nor', 'on', 'at', 'to', 'from', 
+      'by', 'about', 'in', 'of', 'with', 'during', 'including', 'until', 'against', 
+      'among', 'throughout', 'despite', 'towards', 'upon', 'concerning', 'is', 'are', 
+      'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 
+      'can', 'could', 'shall', 'should', 'will', 'would', 'may', 'might', 'must', 'i', 
+      'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'this', 
+      'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+    ]);
+    
+    // Filter out stop words and short words
+    const keywordCandidates = tokens.filter(token => 
+      token.length > 3 && !stopWords.has(token) && /^[a-z0-9]+$/.test(token)
     );
     
-    // Count word frequency
-    const wordCounts: {[key: string]: number} = {};
-    words.forEach(word => {
-      wordCounts[word] = (wordCounts[word] || 0) + 1;
-    });
+    // Count occurrences of each word
+    const wordCounts = new Map<string, number>();
+    for (const word of keywordCandidates) {
+      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+    }
     
-    // Sort by frequency and return top 5-10 keywords
-    const sortedWords = Object.entries(wordCounts)
+    // Sort by frequency
+    const sortedWords = [...wordCounts.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(entry => entry[0]);
     
-    return sortedWords.slice(0, 10);
+    // Extract key phrases (2-3 word combinations that appear together)
+    const phrases: string[] = [];
+    if (message.length > 10) {
+      const phraseRegex = /([A-Z][a-z]{2,} )+[A-Z][a-z]{2,}/g;
+      const matches = message.match(phraseRegex) || [];
+      phrases.push(...matches);
+    }
+    
+    // Combine individual keywords and phrases, remove duplicates
+    const combinedKeywords = [...new Set([...sortedWords.slice(0, 10), ...phrases])];
+    
+    return combinedKeywords.slice(0, 15); // Limit to top 15 keywords/phrases
   }
 }
 
