@@ -117,4 +117,30 @@ export const onAuthStateChange = (callback: (user: AuthUser | null) => void) => 
   return supabase.auth.onAuthStateChange((event, session) => {
     callback(session?.user || null);
   });
+};
+
+// Verify email
+export const verifyEmail = async (token: string): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'email',
+    });
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (email: string): Promise<{ error: Error | null }> => {
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    });
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
 }; 

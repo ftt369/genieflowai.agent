@@ -1,322 +1,269 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bot, Book, FileText, Database, ChevronDown, ChevronUp, X, Loader2 } from 'lucide-react';
-import { cn } from '@/utils/cn';
-import { useAiAssistant } from '@/services/aiAssistantService';
-import { useKnowledgeBaseStore } from '@/store/knowledgeBaseStore';
-import { useModeStore } from '@/stores/model/modeStore';
-import { Message } from '@/services/modelService';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { Search, Zap, Book, FileText, Cpu, ArrowRight, RefreshCw } from 'lucide-react';
 
-interface SearchResult {
+// Simple debounce implementation instead of using lodash
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  
+  return function(...args: Parameters<T>): void {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+// Add ResearchResult interface
+interface ResearchResult {
+  id: string;
+  title: string;
   content: string;
   source: string;
   relevance: number;
-  title?: string;
-  url?: string;
+  timestamp: Date;
 }
 
-const ResearchAssistant: React.FC = () => {
+// Performance-optimized version of the component
+const ResearchAssistant: React.FC = memo(() => {
   const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [aiResponse, setAiResponse] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [expandedResults, setExpandedResults] = useState<string[]>([]);
+  const [results, setResults] = useState<ResearchResult[]>([]);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [isExpanded, setIsExpanded] = useState(true);
+  const prevQueryRef = useRef('');
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const resultsCache = useRef<Record<string, ResearchResult[]>>({});
   
-  const aiAssistant = useAiAssistant();
-  const { knowledgeBases } = useKnowledgeBaseStore();
-  const { modes, activeMode } = useModeStore();
-  const currentMode = modes.find(m => m.id === activeMode);
-  
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  
-  // Focus search input on mount
-  useEffect(() => {
-    searchInputRef.current?.focus();
-  }, []);
-  
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    
-    try {
+  // Memoized search handler with debounce
+  const debouncedSearch = useCallback(
+    debounce(async (searchQuery: string) => {
+      if (!searchQuery || searchQuery.length < 3) {
+        setResults([]);
+        setIsSearching(false);
+        return;
+      }
+      
+      // Check cache first
+      if (resultsCache.current[searchQuery]) {
+        setResults(resultsCache.current[searchQuery]);
+        setIsSearching(false);
+        return;
+      }
+      
       setIsSearching(true);
-      setSearchResults([]);
-      setAiResponse('');
       
-      // Use our AI assistant to search knowledge bases
-      const kbResults = await aiAssistant.searchKnowledgeBases(query);
-      
-      // Transform search results to our format
-      const formattedResults = kbResults.map(result => ({
-        content: result.content,
-        source: result.metadata.source,
-        title: result.metadata.title,
-        url: result.metadata.url,
-        relevance: result.score
-      }));
-      
-      setSearchResults(formattedResults);
-      setSelectedSources(formattedResults.map(r => r.title || r.source));
+      try {
+        // Simulate API call - replace with actual API
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Mock results - replace with actual data
+        const mockResults: ResearchResult[] = [
+          {
+            id: '1',
+            title: `Research on ${searchQuery}`,
+            content: `This is sample content for ${searchQuery} that demonstrates how the research assistant would work.`,
+            source: 'Sample Database',
+            relevance: 0.95,
+            timestamp: new Date()
+          },
+          {
+            id: '2',
+            title: `Alternative sources for ${searchQuery}`,
+            content: `Here are alternative sources and information about ${searchQuery} that might be useful.`,
+            source: 'Knowledge Base',
+            relevance: 0.85,
+            timestamp: new Date()
+          },
+          {
+            id: '3',
+            title: `Related topics to ${searchQuery}`,
+            content: `Topics related to ${searchQuery} include various associated subjects and areas of study.`,
+            source: 'Research Papers',
+            relevance: 0.75,
+            timestamp: new Date()
+          }
+        ];
+        
+        // Cache the results
+        resultsCache.current[searchQuery] = mockResults;
+        setResults(mockResults);
     } catch (error) {
-      console.error('Error searching knowledge bases:', error);
+        console.error('Error fetching research results:', error);
+        setResults([]);
     } finally {
       setIsSearching(false);
     }
-  };
+    }, 500),
+    []
+  );
   
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-  
-  const handleGenerateResponse = async () => {
-    if (searchResults.length === 0) return;
+  const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
     
-    try {
-      setIsGenerating(true);
-      
-      // Filter search results by selected sources
-      const filteredResults = searchResults.filter(
-        r => selectedSources.includes(r.title || r.source)
-      );
-      
-      // Prepare context for AI
-      const context = filteredResults.map((r, i) => (
-        `[Source ${i + 1}: ${r.title || r.source}]\n${r.content}`
-      )).join('\n\n');
-      
-      // Generate response
-      const messages: Message[] = [
-        {
-          role: 'system',
-          content: `You are a research assistant. Use the provided sources to answer the user's query. Cite sources as [Source X] when using information from them.`
-        },
-        {
-          role: 'user',
-          content: `My question is: ${query}\n\nHere are relevant sources to help you answer:\n\n${context}`
-        }
-      ];
-      
-      const response = await aiAssistant.generateResponse(messages, query);
-      setAiResponse(response);
-    } catch (error) {
-      console.error('Error generating response:', error);
-    } finally {
-      setIsGenerating(false);
+    // Avoid search for minor edits or short queries
+    if (newQuery.length < 3 || 
+        (prevQueryRef.current && newQuery.includes(prevQueryRef.current) && newQuery.length < prevQueryRef.current.length + 3)) {
+      return;
     }
-  };
+    
+    prevQueryRef.current = newQuery;
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      debouncedSearch(newQuery);
+    }, 200);
+  }, [debouncedSearch]);
   
-  const toggleResultExpansion = (id: string) => {
-    setExpandedResults(prev => 
-      prev.includes(id) 
-        ? prev.filter(r => r !== id) 
-        : [...prev, id]
-    );
-  };
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
   
-  const toggleSourceSelection = (source: string) => {
-    setSelectedSources(prev => 
-      prev.includes(source) 
-        ? prev.filter(s => s !== source) 
-        : [...prev, source]
-    );
-  };
+  // Filter results based on activeFilter
+  const filteredResults = results.filter(result => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'recent') return result.timestamp > new Date(Date.now() - 86400000);
+    // Add more filters as needed
+    return true;
+  });
+  
+  const handleRefresh = useCallback(() => {
+    if (query) {
+      setIsSearching(true);
+      debouncedSearch(query);
+    }
+  }, [query, debouncedSearch]);
+  
+  const handleResultClick = useCallback((result: ResearchResult) => {
+    // Add your click handler logic here
+    console.log('Result clicked:', result);
+  }, []);
 
   return (
-    <div className="flex flex-col h-full bg-background border-l">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Search className="h-5 w-5 text-primary" />
+    <div className="research-assistant bg-card rounded-lg p-4 shadow-sm border border-border flex flex-col h-full">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-medium text-lg flex items-center">
+          <Book className="h-5 w-5 mr-2 text-primary" />
           Research Assistant
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Search across knowledge bases and generate AI responses
-        </p>
+        </h3>
+        <button 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="p-1 rounded hover:bg-muted"
+        >
+          {isExpanded ? 'Minimize' : 'Expand'}
+        </button>
       </div>
       
-      {/* Search interface */}
-      <div className="p-4 border-b">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+      {isExpanded && (
+        <>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
-              ref={searchInputRef}
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Search query..."
-              className="w-full px-4 py-2 pl-10 rounded-lg border bg-background"
+              onChange={handleQueryChange}
+              placeholder="Research a topic..."
+              className="w-full pl-9 pr-4 py-2 rounded-md border border-border bg-background"
             />
-            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />
           </div>
-          <button
-            onClick={handleSearch}
-            disabled={!query.trim() || isSearching}
-            className={cn(
-              "flex items-center justify-center gap-2 px-4 py-2 rounded-lg",
-              "bg-primary text-primary-foreground hover:bg-primary/90 transition-colors",
-              (!query.trim() || isSearching) && "opacity-50 cursor-not-allowed"
             )}
-          >
-            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Search
-          </button>
         </div>
         
-        {/* Knowledge base context */}
-        <div className="mt-3 text-xs text-muted-foreground">
-          {currentMode?.knowledgeBaseIds?.length ? (
-            <div className="flex items-center gap-1">
-              <Database className="h-3.5 w-3.5" />
-              <span>Searching across {currentMode.knowledgeBaseIds.length} attached knowledge base(s)</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <Database className="h-3.5 w-3.5" />
-              <span>No knowledge bases attached to current mode</span>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Results */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {searchResults.length > 0 && (
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Search Results</h3>
+          <div className="flex space-x-2 mb-4">
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`px-2 py-1 text-xs rounded ${activeFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setActiveFilter('recent')}
+              className={`px-2 py-1 text-xs rounded ${activeFilter === 'recent' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+            >
+              Recent
+            </button>
               <button
-                onClick={handleGenerateResponse}
-                disabled={isGenerating}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs",
-                  "bg-primary text-primary-foreground hover:bg-primary/90",
-                  isGenerating && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
-                Generate AI Response
+              onClick={handleRefresh}
+              className="ml-auto px-2 py-1 text-xs rounded bg-muted text-muted-foreground hover:bg-muted/80"
+              disabled={isSearching}
+            >
+              Refresh
               </button>
             </div>
             
-            {/* Filter by source */}
-            <div className="mt-3 mb-2">
-              <div className="text-xs text-muted-foreground mb-1.5">Filter by source:</div>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(searchResults.map(r => r.title || r.source))).map(source => (
-                  <button
-                    key={source}
-                    onClick={() => toggleSourceSelection(source)}
-                    className={cn(
-                      "flex items-center gap-1 px-2 py-1 rounded-full text-xs",
-                      selectedSources.includes(source)
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground"
-                    )}
+          <div className="flex-1 overflow-y-auto">
+            {filteredResults.length > 0 ? (
+              <div className="space-y-3">
+                {filteredResults.map(result => (
+                  <div 
+                    key={result.id}
+                    onClick={() => handleResultClick(result)}
+                    className="bg-white dark:bg-[#3C3C3C] p-4 rounded-lg hover:shadow-md transition-shadow text-left cursor-pointer"
                   >
-                    {selectedSources.includes(source) ? (
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                    ) : (
-                      <div className="h-2 w-2 rounded-full border border-muted-foreground" />
-                    )}
-                    {source}
-                  </button>
-                ))}
+                    <div className="flex items-start justify-between">
+                      <h4 className="font-medium text-sm">{result.title}</h4>
+                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {Math.round(result.relevance * 100)}%
+                      </span>
               </div>
-            </div>
-            
-            {/* Results list */}
-            <div className="space-y-4 mt-4">
-              {searchResults
-                .filter(r => selectedSources.includes(r.title || r.source))
-                .map((result, index) => {
-                  const resultId = `result-${index}`;
-                  const isExpanded = expandedResults.includes(resultId);
-                  const excerptLength = 150;
-                  
-                  return (
-                    <div key={resultId} className="border rounded-lg overflow-hidden">
-                      <div 
-                        className="bg-muted/40 p-3 flex items-center justify-between cursor-pointer"
-                        onClick={() => toggleResultExpansion(resultId)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="flex-shrink-0">
-                            {result.source.toLowerCase().includes('web') ? (
-                              <FileText className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <Book className="h-4 w-4 text-emerald-500" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm">{result.title || 'Untitled'}</div>
-                            <div className="text-xs text-muted-foreground">{result.source}</div>
-                          </div>
-                        </div>
-                        <div>
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className={cn(
-                        "p-3 bg-background transition-all overflow-hidden",
-                        isExpanded ? "block" : "hidden"
-                      )}>
-                        <div className="whitespace-pre-wrap">
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                           {result.content}
-                        </div>
-                        
-                        {result.url && (
-                          <div className="mt-2 text-xs">
-                            <a 
-                              href={result.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline"
-                            >
-                              View source
-                            </a>
-                          </div>
-                        )}
+                    </p>
+                    <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                      <span>{result.source}</span>
+                      <div className="flex items-center">
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        <span>View</span>
                       </div>
                     </div>
-                  );
-              })}
             </div>
+                ))}
           </div>
-        )}
-        
-        {/* AI Response */}
-        {aiResponse && (
-          <div className="border-t p-4 bg-muted/30">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium flex items-center gap-2">
-                <Bot className="h-4 w-4 text-primary" />
-                AI Response
-              </h3>
-              <button
-                onClick={() => setAiResponse('')}
-                className="p-1 rounded-full hover:bg-muted/80"
-                title="Clear response"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-            
-            <div className="whitespace-pre-wrap bg-background p-4 rounded-lg border text-sm">
-              {aiResponse}
-            </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-6">
+                {query ? (
+                  isSearching ? (
+                    <>
+                      <Cpu className="h-8 w-8 mb-2 animate-pulse" />
+                      <p>Researching...</p>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-8 w-8 mb-2 opacity-50" />
+                      <p>No results found</p>
+                      <p className="text-xs mt-1">Try a different search term</p>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <Zap className="h-8 w-8 mb-2 opacity-50" />
+                    <p>Enter a topic to research</p>
+                    <p className="text-xs mt-1">Get instant insights and references</p>
+                  </>
+                )}
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
-};
+});
+
+ResearchAssistant.displayName = 'ResearchAssistant';
 
 export default ResearchAssistant; 

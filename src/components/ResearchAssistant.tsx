@@ -3,12 +3,34 @@ import { useAiAssistant } from '../services/aiAssistantService';
 import { useDocumentStore } from '../stores/documentStore';
 import { Message } from '../services/modelService';
 
-// Utility function for debouncing
+// Utility function for debouncing with improved performance
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout;
+  let lastArgs: any[] | null = null;
+  
   return function(...args: any[]) {
+    lastArgs = args;
+    
+    // Use a flag to prevent multiple pending executions
+    const shouldCallImmediately = !timeout;
+    
     clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    timeout = setTimeout(() => {
+      if (lastArgs) {
+        func(...lastArgs);
+        lastArgs = null;
+      }
+    }, wait);
+    
+    // For initial execution, run immediately with reduced delay
+    if (shouldCallImmediately) {
+      setTimeout(() => {
+        if (lastArgs) {
+          func(...lastArgs);
+          lastArgs = null;
+        }
+      }, wait / 3); // Faster initial response
+    }
   };
 };
 
@@ -76,6 +98,57 @@ interface ResearchAssistantProps {
   onSuggestionClick: (suggestion: string) => void;
 }
 
+// Add a cache for API responses to prevent duplicate requests
+const responseCache = new Map<string, {
+  timestamp: number;
+  result: string[];
+}>();
+
+const MAX_CACHE_AGE = 5 * 60 * 1000; // 5 minutes cache lifetime
+const MAX_CACHE_SIZE = 50; // Maximum number of cache entries
+
+// Function to create a cache key from messages
+const createCacheKey = (messages: Message[], type: string): string => {
+  // Use the last 3 messages for the cache key to balance specificity and reuse
+  const recentMessages = messages.slice(-3);
+  const messagesKey = recentMessages
+    .map(m => `${m.role}:${m.content.substring(0, 100)}`)
+    .join('|');
+  return `${type}:${messagesKey}`;
+};
+
+// Helper to check and manage cache
+const getCachedResponse = (key: string): string[] | null => {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+  
+  // Check if cache is still valid
+  if (Date.now() - cached.timestamp > MAX_CACHE_AGE) {
+    responseCache.delete(key);
+    return null;
+  }
+  
+  return cached.result;
+};
+
+// Helper to save to cache
+const setCachedResponse = (key: string, result: string[]): void => {
+  // Clean up cache if it gets too large
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    // Delete oldest entries
+    const entries = Array.from(responseCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    for (let i = 0; i < Math.min(5, entries.length / 5); i++) {
+      responseCache.delete(entries[i][0]);
+    }
+  }
+  
+  responseCache.set(key, {
+    timestamp: Date.now(),
+    result
+  });
+};
+
 const ResearchAssistant: React.FC<ResearchAssistantProps> = ({ 
   messages, 
   onSuggestionClick 
@@ -112,7 +185,7 @@ const ResearchAssistant: React.FC<ResearchAssistantProps> = ({
     }
   }, [analyzedContext]);
   
-  // Create a debounced version of the content generation function
+  // Create a debounced version of the content generation function with lower latency
   const debouncedGenerateContent = useCallback(
     debounce(async () => {
       if (messages.length === 0) return;
@@ -122,40 +195,49 @@ const ResearchAssistant: React.FC<ResearchAssistantProps> = ({
       try {
         console.log("ResearchAssistant: Generating suggestions, flows, and questions");
         
-        // 1. Generate suggestions
+        // 1. Generate suggestions with caching
         try {
-          let newSuggestions: string[] = [];
-          if (currentDocument) {
-            newSuggestions = await aiAssistant.generateProactiveSuggestions(
-              messages,
-              currentDocument
-            );
+          const suggestionCacheKey = createCacheKey(messages, 'suggestions');
+          const cachedSuggestions = getCachedResponse(suggestionCacheKey);
+          
+          if (cachedSuggestions) {
+            console.log("ResearchAssistant: Using cached suggestions");
+            setSuggestions(cachedSuggestions);
           } else {
-            const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
-            if (filteredMessages.length > 0) {
-              const suggestionPrompt: Message = {
-                role: 'system',
-                content: `Based on the current conversation about "${getConversationTopic(filteredMessages)}", generate 3-5 follow-up questions or suggestions that would help deepen the research and understanding. Format as simple, actionable prompts.`
-              };
-              const suggestionsResponse = await aiAssistant.safeGenerateText([...filteredMessages, suggestionPrompt], [
-                "What would you like to know more about?",
-                "Do you have any specific questions I can help with?",
-                "Would you like some general research suggestions?"
-              ]);
-              newSuggestions = suggestionsResponse
-                .split(/\d+\./)
-                .filter(line => line.trim().length > 0)
-                .map(line => line.trim());
+            let newSuggestions: string[] = [];
+            if (currentDocument) {
+              newSuggestions = await aiAssistant.generateProactiveSuggestions(
+                messages,
+                currentDocument
+              );
             } else {
-              newSuggestions = [
-                "What would you like to know more about?",
-                "Do you have any specific questions I can help with?",
-                "Would you like some general research suggestions?"
-              ];
+              const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
+              if (filteredMessages.length > 0) {
+                const suggestionPrompt: Message = {
+                  role: 'system',
+                  content: `Based on the current conversation about "${getConversationTopic(filteredMessages)}", generate 3-5 follow-up questions or suggestions that would help deepen the research and understanding. Format as simple, actionable prompts.`
+                };
+                const suggestionsResponse = await aiAssistant.safeGenerateText([...filteredMessages, suggestionPrompt], [
+                  "What would you like to know more about?",
+                  "Do you have any specific questions I can help with?",
+                  "Would you like some general research suggestions?"
+                ]);
+                newSuggestions = suggestionsResponse
+                  .split(/\d+\./)
+                  .filter(line => line.trim().length > 0)
+                  .map(line => line.trim());
+              } else {
+                newSuggestions = [
+                  "What would you like to know more about?",
+                  "Do you have any specific questions I can help with?",
+                  "Would you like some general research suggestions?"
+                ];
+              }
             }
+            console.log("ResearchAssistant: Generated suggestions:", newSuggestions);
+            setSuggestions(newSuggestions);
+            setCachedResponse(suggestionCacheKey, newSuggestions);
           }
-          console.log("ResearchAssistant: Generated suggestions:", newSuggestions);
-          setSuggestions(newSuggestions);
         } catch (error) {
           console.error("Error generating suggestions:", error);
           setSuggestions([
@@ -165,14 +247,22 @@ const ResearchAssistant: React.FC<ResearchAssistantProps> = ({
           ]);
         }
         
+        // Only generate other content when needed - lazy loading approach
         // 2. Generate research flows (only if needed)
         if (activeTab === 'flows' || researchFlows.length === 0) {
           try {
-            const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
-            if (filteredMessages.length > 0) {
-              const flowPrompt: Message = {
-                role: 'system',
-                content: `Based on the conversation about "${getConversationTopic(filteredMessages)}"${currentDocument ? ` and the document "${currentDocument.fileName}"` : ''}, create 3-5 educational research flows that would help deepen understanding through progressive learning.
+            const flowCacheKey = createCacheKey(messages, 'flows');
+            const cachedFlows = getCachedResponse(flowCacheKey);
+            
+            if (cachedFlows) {
+              console.log("ResearchAssistant: Using cached research flows");
+              setResearchFlows(cachedFlows);
+            } else {
+              const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
+              if (filteredMessages.length > 0) {
+                const flowPrompt: Message = {
+                  role: 'system',
+                  content: `Based on the conversation about "${getConversationTopic(filteredMessages)}"${currentDocument ? ` and the document "${currentDocument.fileName}"` : ''}, create 3-5 educational research flows that would help deepen understanding through progressive learning.
 
 Each research flow should:
 1. Start with a foundational concept or question
@@ -186,23 +276,29 @@ Format as multi-line structured flows with clear titles and educational progress
 - Step 3: [Advanced application/critical thinking]"
 
 Make these flows highly educational and designed to promote deeper learning.`
-              };
-              const flowsResponse = await aiAssistant.safeGenerateText([...filteredMessages, flowPrompt], [
-                "**Research Flow: Foundational Understanding**\n- Step 1: Explore basic principles and terminology\n- Step 2: Study key components and relationships\n- Step 3: Analyze how these foundations apply in different contexts",
-                "**Research Flow: Critical Analysis**\n- Step 1: Identify main arguments and evidence\n- Step 2: Evaluate strengths and limitations\n- Step 3: Formulate your own perspective based on evidence",
-                "**Research Flow: Practical Applications**\n- Step 1: Discover real-world examples\n- Step 2: Examine implementation methods\n- Step 3: Consider how to adapt concepts to new situations"
-              ]);
-              const extractedFlows = flowsResponse
-                .split(/\*\*Research Flow:|Flow \d+:/)
-                .filter(line => line.trim().length > 0)
-                .map(line => {
-                  // Format as a complete research flow with proper formatting
-                  const formattedFlow = line.trim().startsWith('**') ? line.trim() : `**Research Flow: ${line.trim()}`;
-                  return formattedFlow;
-                });
-              console.log("ResearchAssistant: Generated research flows:", extractedFlows);  
-              setResearchFlows(extractedFlows);
-            } 
+                };
+                const flowsResponse = await aiAssistant.safeGenerateText([...filteredMessages, flowPrompt], [
+                  "**Research Flow: Foundational Understanding**\n- Step 1: Explore basic principles and terminology\n- Step 2: Study key components and relationships\n- Step 3: Analyze how these foundations apply in different contexts",
+                  "**Research Flow: Critical Analysis**\n- Step 1: Identify main arguments and evidence\n- Step 2: Evaluate strengths and limitations\n- Step 3: Formulate your own perspective based on evidence",
+                  "**Research Flow: Practical Applications**\n- Step 1: Discover real-world examples\n- Step 2: Examine implementation methods\n- Step 3: Consider how to adapt concepts to new situations"
+                ]);
+                const extractedFlows = flowsResponse
+                  .split(/\*\*Research Flow:|Flow \d+:/)
+                  .filter(line => line.trim().length > 0)
+                  .map(line => {
+                    // Format as a complete research flow with proper formatting
+                    const formattedFlow = line.trim().startsWith('**') ? line.trim() : `**Research Flow: ${line.trim()}`;
+                    return formattedFlow;
+                  });
+                console.log("ResearchAssistant: Generated research flows:", extractedFlows);  
+                setResearchFlows(extractedFlows);
+                
+                // Cache the results
+                if (extractedFlows && extractedFlows.length > 0) {
+                  setCachedResponse(flowCacheKey, extractedFlows);
+                }
+              } 
+            }
           } catch (error) {
             console.error("Error generating research flows:", error);
           }
@@ -211,11 +307,18 @@ Make these flows highly educational and designed to promote deeper learning.`
         // 3. Generate proactive questions (only if needed)
         if (activeTab === 'questions' || proactiveQuestions.length === 0) {
           try {
-            const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
-            if (filteredMessages.length > 0) {
-              const questionPrompt: Message = {
-                role: 'system',
-                content: `Based on the conversation about "${getConversationTopic(filteredMessages)}"${currentDocument ? ` and the document "${currentDocument.fileName}"` : ''}, generate 5-7 thought-provoking questions that promote deeper learning and critical thinking.
+            const questionCacheKey = createCacheKey(messages, 'questions');
+            const cachedQuestions = getCachedResponse(questionCacheKey);
+            
+            if (cachedQuestions) {
+              console.log("ResearchAssistant: Using cached questions");
+              setProactiveQuestions(cachedQuestions);
+            } else {
+              const filteredMessages = messages.filter(msg => msg.content && msg.content.trim() !== '');
+              if (filteredMessages.length > 0) {
+                const questionPrompt: Message = {
+                  role: 'system',
+                  content: `Based on the conversation about "${getConversationTopic(filteredMessages)}"${currentDocument ? ` and the document "${currentDocument.fileName}"` : ''}, generate 5-7 thought-provoking questions that promote deeper learning and critical thinking.
 
 Your questions should:
 1. Challenge existing assumptions and encourage new perspectives
@@ -228,20 +331,26 @@ Format each question with a brief context explaining why it's valuable to explor
 For example: "**[Question]** (This explores the underlying mechanisms and challenges conventional wisdom about X)"
 
 Make these questions intellectually stimulating and designed to promote further independent research.`
-              };
-              const questionsResponse = await aiAssistant.safeGenerateText([...filteredMessages, questionPrompt], [
-                "**What are the fundamental principles that underlie this topic?** (Understanding the core concepts will help build a solid foundation for more advanced exploration)",
-                "**How has our understanding of this subject evolved over time?** (This explores the historical context and how knowledge development shapes current perspectives)",
-                "**What are the most significant criticisms or limitations of the current approaches?** (Examining limitations helps identify areas for improvement and deeper analysis)",
-                "**How might this knowledge be applied in different contexts or disciplines?** (Exploring applications encourages creative thinking and interdisciplinary connections)",
-                "**What ethical considerations or societal implications should be considered?** (This promotes thinking about broader impacts beyond the technical aspects)"
-              ]);
-              const extractedQuestions = questionsResponse
-                .split(/\d+[\.\)]\s+|\n\n/)
-                .filter(line => line.trim().length > 0 && (line.includes('?') || line.startsWith('**')))
-                .map(line => line.trim());
-              console.log("ResearchAssistant: Generated questions:", extractedQuestions);
-              setProactiveQuestions(extractedQuestions);
+                };
+                const questionsResponse = await aiAssistant.safeGenerateText([...filteredMessages, questionPrompt], [
+                  "**What are the fundamental principles that underlie this topic?** (Understanding the core concepts will help build a solid foundation for more advanced exploration)",
+                  "**How has our understanding of this subject evolved over time?** (This explores the historical context and how knowledge development shapes current perspectives)",
+                  "**What are the most significant criticisms or limitations of the current approaches?** (Examining limitations helps identify areas for improvement and deeper analysis)",
+                  "**How might this knowledge be applied in different contexts or disciplines?** (Exploring applications encourages creative thinking and interdisciplinary connections)",
+                  "**What ethical considerations or societal implications should be considered?** (This promotes thinking about broader impacts beyond the technical aspects)"
+                ]);
+                const extractedQuestions = questionsResponse
+                  .split(/\d+[\.\)]\s+|\n\n/)
+                  .filter(line => line.trim().length > 0 && (line.includes('?') || line.startsWith('**')))
+                  .map(line => line.trim());
+                console.log("ResearchAssistant: Generated questions:", extractedQuestions);
+                setProactiveQuestions(extractedQuestions);
+                
+                // Cache the results
+                if (extractedQuestions && extractedQuestions.length > 0) {
+                  setCachedResponse(questionCacheKey, extractedQuestions);
+                }
+              }
             }
           } catch (error) {
             console.error("Error generating proactive questions:", error);
@@ -252,8 +361,8 @@ Make these questions intellectually stimulating and designed to promote further 
       } finally {
         setLoading(false);
       }
-    }, 500), // 500ms debounce delay
-    [messages, currentDocument, aiAssistant, activeTab, researchFlows.length, proactiveQuestions.length]
+    }, 800), // Reduced from typical 1000ms to 800ms for faster response
+    [messages, currentDocument, activeTab, aiAssistant]
   );
   
   // Generate research content when messages or document changes

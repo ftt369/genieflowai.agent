@@ -155,7 +155,19 @@ const getLucideIcon = (iconString: string, size: "sm" | "md" | "lg" = "md") => {
   return iconMap[iconString] || <Bot className={className} />;
 };
 
-export default function ModeDropdown() {
+interface ModeDropdownProps {
+  onSelect?: (modeId: string) => void;
+  onOpenSettings?: () => void;
+  onCreateMode?: () => void;
+  onCustomizeMode?: (modeId: string) => void;
+}
+
+export default function ModeDropdown({
+  onSelect,
+  onOpenSettings,
+  onCreateMode,
+  onCustomizeMode
+}: ModeDropdownProps = {}) {
   const { modes, activeMode, setActiveMode, customModes, addCustomMode, updateMode, deleteCustomMode, recentlyUsedModes, reorderModes, toggleFavorite, favoriteModesIds, resetToDefaultModes } = useModeStore();
   const { profile } = useThemeStore();
   const [showMenu, setShowMenu] = useState(false);
@@ -208,12 +220,16 @@ export default function ModeDropdown() {
   const handleSelectMode = (modeId: string) => {
     setActiveMode(modeId);
     setShowMenu(false);
+    // Force dropdown to close
+    document.body.click();
+    onSelect?.(modeId);
   };
   
   // Handle create mode
   const handleCreateMode = () => {
     setShowMenu(false);
     setShowTemplateDialog(true);
+    onCreateMode?.();
   };
   
   // Handle template selection
@@ -769,6 +785,10 @@ export default function ModeDropdown() {
               isSpiralStyle && "hover:bg-blue-50 dark:hover:bg-blue-900/20"
             )}
             title="Select mode (Alt+M)"
+            onClick={() => {
+              // Toggle the menu and ensure active state
+              setShowMenu(prev => !prev);
+            }}
           >
             <span className="text-sm font-medium flex items-center">
               {currentMode?.icon && <span className="mr-1">{getLucideIcon(currentMode.icon, "sm")}</span>}
@@ -784,8 +804,9 @@ export default function ModeDropdown() {
         
         <DropdownMenuContent 
           ref={menuRef} 
-          className="w-64 max-h-[70vh] overflow-y-auto bg-background border border-border shadow-lg" 
+          className="w-64 max-h-[70vh] overflow-y-auto bg-background border border-border shadow-lg bevel-glass backdrop-filter backdrop-blur-lg bg-opacity-90 flex flex-col" 
           align="start"
+          style={{ maxHeight: "calc(100vh - 100px)", overflowY: "auto", overscrollBehavior: "contain" }}
         >
           <div className="p-2">
             <Input
@@ -800,283 +821,155 @@ export default function ModeDropdown() {
           
           <DropdownMenuSeparator />
           
-          {/* Categorized Modes */}
-          {!searchQuery ? (
-            <>
-              {/* Favorite modes */}
-              {favoriteModesIds.length > 0 && (
-                <div>
-                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                    Favorites
-                  </div>
-                  {modes
-                    .filter(mode => favoriteModesIds.includes(mode.id))
-                    .map(mode => (
-                      <DropdownMenuItem 
-                        key={`favorite-${mode.id}`}
-                        className={cn(
-                          "flex items-center gap-2 cursor-pointer",
-                          mode.id === activeMode && "bg-gray-100 dark:bg-gray-800",
-                          isSpiralStyle && mode.id === activeMode && "bg-blue-50 dark:bg-blue-900/20"
-                        )}
-                        onClick={() => handleSelectMode(mode.id)}
-                      >
-                        <span className="text-lg">{getLucideIcon(mode.icon, "md")}</span>
-                        <div className="flex-1">
-                          <span className="font-medium">{mode.name}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{mode.description}</span>
-                        </div>
-                        <button 
-                          onClick={(e) => handleToggleFavorite(e, mode.id)}
-                          className="text-yellow-400"
-                          title="Remove from favorites"
-                        >
-                          <Star className="h-4 w-4 fill-current" />
-                        </button>
-                      </DropdownMenuItem>
-                    ))
-                  }
-                  <DropdownMenuSeparator />
-                </div>
-              )}
-              
-              {/* Recently used modes */}
-              {recentlyUsedModes.length > 0 && (
-                <div>
-                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                    Recently Used
-                  </div>
-                  {recentlyUsedModes
-                    .filter(modeId => modeId !== activeMode)
-                    .slice(0, 3)
-                    .map(modeId => {
-                      const mode = modes.find(m => m.id === modeId);
-                      if (!mode) return null;
-                      return (
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+            {/* Categorized Modes */}
+            {!searchQuery ? (
+              <>
+                {/* Favorite modes */}
+                {favoriteModesIds.length > 0 && (
+                  <div>
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      Favorites
+                    </div>
+                    {modes
+                      .filter(mode => favoriteModesIds.includes(mode.id))
+                      .map(mode => (
                         <DropdownMenuItem 
-                          key={`recent-${mode.id}`}
+                          key={`favorite-${mode.id}`}
                           className={cn(
-                            "flex items-center gap-2 cursor-pointer",
-                            "bg-gray-50 dark:bg-gray-800/50"
+                            "flex items-center gap-2 cursor-pointer rounded-md mb-1",
+                            mode.id === activeMode ? "bg-primary/10 border border-primary/20" : "hover:bg-accent/50",
+                            isSpiralStyle && mode.id === activeMode && "bg-blue-50/90 dark:bg-blue-900/50"
                           )}
                           onClick={() => handleSelectMode(mode.id)}
                         >
                           <span className="text-lg">{getLucideIcon(mode.icon, "md")}</span>
-                          <div className="flex flex-col">
+                          <div className="flex-1">
                             <span className="font-medium">{mode.name}</span>
                             <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{mode.description}</span>
                           </div>
-                        </DropdownMenuItem>
-                      );
-                    })
-                  }
-                  <DropdownMenuSeparator />
-                </div>
-              )}
-              
-              {/* Categorized modes */}
-              {Object.entries(groupedModes).map(([category, categoryModes]) => (
-                <div key={category}>
-                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                    {category}
-                  </div>
-                  {categoryModes.map(mode => (
-                    <DropdownMenuItem 
-                      key={mode.id}
-                      className={cn(
-                        "flex items-center gap-2 cursor-pointer",
-                        mode.id === activeMode && "bg-gray-100 dark:bg-gray-800",
-                        isSpiralStyle && mode.id === activeMode && "bg-blue-50 dark:bg-blue-900/20"
-                      )}
-                      onClick={() => handleSelectMode(mode.id)}
-                    >
-                      <span className="text-lg">{getLucideIcon(mode.icon, "md")}</span>
-                      <div className="flex-1">
-                        <span className="font-medium">{mode.name}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{mode.description}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => handleToggleFavorite(e, mode.id)}
-                        className={cn(
-                          "opacity-50 hover:opacity-100",
-                          favoriteModesIds.includes(mode.id) ? "text-yellow-400" : "text-gray-400 hover:text-yellow-400"
-                        )}
-                        title={favoriteModesIds.includes(mode.id) ? "Remove from favorites" : "Add to favorites"}
-                      >
-                        <Star className={cn(
-                          "h-4 w-4",
-                          favoriteModesIds.includes(mode.id) && "fill-current"
-                        )} />
-                      </button>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                </div>
-              ))}
-            </>
-          ) : (
-            // Search Results
-            filterModes(modes).length > 0 ? (
-              filterModes(modes).map(mode => (
-                <DropdownMenuItem 
-                  key={mode.id}
-                  className={cn(
-                    "flex items-center gap-2 cursor-pointer",
-                    mode.id === activeMode && "bg-gray-100 dark:bg-gray-800",
-                    isSpiralStyle && mode.id === activeMode && "bg-blue-50 dark:bg-blue-900/20"
-                  )}
-                  onClick={() => handleSelectMode(mode.id)}
-                >
-                  <span className="text-lg">{getLucideIcon(mode.icon, "md")}</span>
-                  <div className="flex-1">
-                    <span className="font-medium">{mode.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{mode.description}</span>
-                  </div>
-                  <button 
-                    onClick={(e) => handleToggleFavorite(e, mode.id)}
-                    className={cn(
-                      "opacity-50 hover:opacity-100",
-                      favoriteModesIds.includes(mode.id) ? "text-yellow-400" : "text-gray-400 hover:text-yellow-400"
-                    )}
-                    title={favoriteModesIds.includes(mode.id) ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Star className={cn(
-                      "h-4 w-4",
-                      favoriteModesIds.includes(mode.id) && "fill-current"
-                    )} />
-                  </button>
-                </DropdownMenuItem>
-              ))
-            ) : (
-              <div className="px-2 py-4 text-center text-gray-500 dark:text-gray-400">
-                No modes found
-              </div>
-            )
-          )}
-          
-          <DropdownMenuSeparator />
-          
-          {/* Actions */}
-          <div className="p-2">
-            <Button 
-              variant="outline" 
-              className="w-full flex items-center justify-center gap-2"
-              onClick={() => {
-                setShowMenu(false);
-                setShowModeDialog(true);
-              }}
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>Manage Modes</span>
-            </Button>
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      
-      {/* Mode Management Dialog */}
-      <Dialog open={showModeDialog} onOpenChange={setShowModeDialog}>
-        <DialogContent className="sm:max-w-[525px] bg-background border border-border">
-          <DialogHeader>
-            <DialogTitle>Manage Assistant Modes</DialogTitle>
-          </DialogHeader>
-          
-          <Tabs defaultValue="preset">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="preset">Preset Modes</TabsTrigger>
-              <TabsTrigger value="custom">Custom Modes</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="preset" className="mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex items-center gap-1" 
-                      onClick={() => document.getElementById('categoryFilterDropdown')?.classList.toggle('hidden')}
-                    >
-                      <Filter className="h-3 w-3" />
-                      <span className="text-xs">Filter</span>
-                      {categoryFilter.length > 0 && (
-                        <span className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                          {categoryFilter.length}
-                        </span>
-                      )}
-                    </Button>
-                    <div 
-                      id="categoryFilterDropdown" 
-                      className="absolute left-0 top-full mt-1 z-50 bg-background border rounded-md shadow-md p-2 hidden"
-                    >
-                      <div className="text-xs font-medium mb-1">Categories</div>
-                      {availableCategories.map(category => (
-                        <div key={category} className="flex items-center gap-2 py-1">
-                          <button
-                            className="flex items-center"
-                            onClick={() => toggleCategoryFilter(category)}
+                          <button 
+                            onClick={(e) => handleToggleFavorite(e, mode.id)}
+                            className="text-yellow-400"
+                            title="Remove from favorites"
                           >
-                            {categoryFilter.includes(category) ? (
+                            <Star className="h-4 w-4 fill-current" />
+                          </button>
+                        </DropdownMenuItem>
+                      ))
+                    }
+                    <DropdownMenuSeparator />
+                  </div>
+                )}
+                
+                {/* Recently used modes */}
+                {recentlyUsedModes.length > 0 && (
+                  <div>
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      Recently Used
+                    </div>
+                    {recentlyUsedModes
+                      .filter(modeId => modeId !== activeMode)
+                      .slice(0, 3)
+                      .map(modeId => {
+                        const mode = modes.find(m => m.id === modeId);
+                        if (!mode) return null;
+                        return (
+                          <DropdownMenuItem 
+                            key={`recent-${mode.id}`}
+                            className={cn(
+                              "flex items-center gap-2 cursor-pointer rounded-md mb-1",
+                              "bg-accent/30 hover:bg-accent/50"
+                            )}
+                            onClick={() => handleSelectMode(mode.id)}
+                          >
+                            <span className="text-lg">{getLucideIcon(mode.icon, "md")}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{mode.name}</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{mode.description}</span>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })
+                    }
+                    <DropdownMenuSeparator />
+                  </div>
+                )}
+                
+                {/* Categorized modes */}
+                {Object.entries(groupedModes).map(([category, categoryModes]) => (
+                  <div key={category}>
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      {category}
+                    </div>
+                    {categoryModes.map(mode => (
+                      <DropdownMenuItem 
+                        key={mode.id}
+                        className={cn(
+                          "relative flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md",
+                          mode.id === activeMode ? "border-primary bg-primary/5 shadow-subtle bevel-glass" : "bg-background/90 shadow-sm bevel-glass",
+                        )}
+                        onClick={() => {
+                          setActiveMode(mode.id);
+                          setShowModeDialog(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleModeForComparison(mode.id);
+                            }}
+                            className="flex-shrink-0 bevel-neumorphic p-1 rounded-md shadow-subtle"
+                          >
+                            {modesToCompare.includes(mode.id) ? (
                               <CheckSquare className="h-4 w-4 text-primary" />
                             ) : (
-                              <Square className="h-4 w-4" />
+                              <Square className="h-4 w-4 text-muted-foreground" />
                             )}
                           </button>
-                          <span className="text-xs">{category}</span>
+                          <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">{getLucideIcon(mode.icon, "lg")}</span>
                         </div>
-                      ))}
-                      <div className="border-t mt-1 pt-1 flex justify-between">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs" 
-                          onClick={() => setCategoryFilter([])}
-                        >
-                          Clear
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs" 
-                          onClick={() => document.getElementById('categoryFilterDropdown')?.classList.add('hidden')}
-                        >
-                          Apply
-                        </Button>
-                      </div>
-                    </div>
+                        <div className="flex-1 mr-2">
+                          <h3 className="font-medium">{mode.name}</h3>
+                          <p className="text-sm text-muted-foreground">{mode.description}</p>
+                        </div>
+                        <div className="absolute right-3 flex gap-1">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportMode(e, mode);
+                          }} title="Share mode">
+                            <Share2 className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateMode(mode);
+                          }} title="Duplicate">
+                            <Copy className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditMode(mode);
+                          }} title="Customize">
+                            <Settings className="h-4 w-4 text-primary" />
+                          </Button>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
                   </div>
-                  
-                  {modesToCompare.length > 0 && (
-                    <div className="text-xs flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md">
-                      <span>{modesToCompare.length} selected</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-5 w-5 p-0" 
-                        onClick={() => setModesToCompare([])}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                
-                {modesToCompare.length >= 2 && (
-                  <Button 
-                    size="sm" 
-                    onClick={handleCompare}
-                  >
-                    Compare
-                  </Button>
-                )}
-              </div>
-              
-              <div className="grid gap-4">
-                {filterModesByCategory(modes.filter(mode => !mode.id.startsWith('custom_'))).map((mode, index) => (
-                  <div 
-                    key={mode.id} 
+                ))}
+              </>
+            ) : (
+              // Search Results
+              filterModes(modes).length > 0 ? (
+                filterModes(modes).map(mode => (
+                  <DropdownMenuItem 
+                    key={mode.id}
                     className={cn(
-                      "flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer",
-                      modesToCompare.includes(mode.id) && "border-primary bg-blue-50 dark:bg-blue-900/20"
+                      "relative flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md",
+                      mode.id === activeMode ? "border-primary bg-primary/5 shadow-subtle bevel-glass" : "bg-background/90 shadow-sm bevel-glass",
                     )}
                     onClick={() => {
                       setActiveMode(mode.id);
@@ -1089,38 +982,230 @@ export default function ModeDropdown() {
                           e.stopPropagation();
                           toggleModeForComparison(mode.id);
                         }}
-                        className="flex-shrink-0"
+                        className="flex-shrink-0 bevel-neumorphic p-1 rounded-md shadow-subtle"
                       >
                         {modesToCompare.includes(mode.id) ? (
                           <CheckSquare className="h-4 w-4 text-primary" />
                         ) : (
-                          <Square className="h-4 w-4 text-gray-400" />
+                          <Square className="h-4 w-4 text-muted-foreground" />
                         )}
                       </button>
-                      <span className="text-2xl">{getLucideIcon(mode.icon, "lg")}</span>
+                      <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">{getLucideIcon(mode.icon, "lg")}</span>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 mr-2">
                       <h3 className="font-medium">{mode.name}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{mode.description}</p>
+                      <p className="text-sm text-muted-foreground">{mode.description}</p>
                     </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={(e) => {
+                    <div className="absolute right-3 flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
                         e.stopPropagation();
                         handleExportMode(e, mode);
                       }} title="Share mode">
-                        <Share2 className="h-4 w-4" />
+                        <Share2 className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={(e) => {
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
                         e.stopPropagation();
                         handleDuplicateMode(mode);
                       }} title="Duplicate">
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={(e) => {
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
                         e.stopPropagation();
                         handleEditMode(mode);
                       }} title="Customize">
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-4 w-4 text-primary" />
+                      </Button>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                <div className="px-2 py-4 text-center text-gray-500 dark:text-gray-400">
+                  No modes found
+                </div>
+              )
+            )}
+          </div>
+          
+          <DropdownMenuSeparator className="mt-auto" />
+          
+          {/* Fixed bottom section */}
+          <div className="p-2 sticky bottom-0 bg-background border-t border-border">
+            <Button 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // First set the state to false
+                setShowMenu(false);
+                // Force a close on the dropdown
+                document.body.click();
+                // Then open the dialog after a short delay
+                setTimeout(() => {
+                  setShowModeDialog(true);
+                }, 100);
+              }}
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Manage Modes</span>
+            </Button>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      
+      {/* Mode Management Dialog */}
+      <Dialog open={showModeDialog} onOpenChange={setShowModeDialog}>
+        <DialogContent className="sm:max-w-[600px] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Manage Assistant Modes</DialogTitle>
+          </DialogHeader>
+          
+          <Tabs defaultValue="preset">
+            <div className="mt-2">
+              <TabsList className="grid w-full grid-cols-2 p-1 bg-muted/30 backdrop-blur-sm rounded-md">
+                <TabsTrigger value="preset" className="rounded-md data-[state=active]:bg-background/80 data-[state=active]:shadow-subtle data-[state=active]:backdrop-blur-md">Preset Modes</TabsTrigger>
+                <TabsTrigger value="custom" className="rounded-md data-[state=active]:bg-background/80 data-[state=active]:shadow-subtle data-[state=active]:backdrop-blur-md">Custom Modes</TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="preset" className="mt-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1 bevel-neumorphic shadow-subtle bg-background/80 backdrop-blur-sm" 
+                      onClick={() => document.getElementById('categoryFilterDropdown')?.classList.toggle('hidden')}
+                    >
+                      <Filter className="h-3 w-3 text-primary" />
+                      <span className="text-xs">Filter</span>
+                      {categoryFilter.length > 0 && (
+                        <span className="bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                          {categoryFilter.length}
+                        </span>
+                      )}
+                    </Button>
+                    <div 
+                      id="categoryFilterDropdown" 
+                      className="absolute left-0 top-full mt-1 z-50 bg-background/95 border rounded-md shadow-3d bevel-glass p-3 hidden backdrop-blur-md"
+                    >
+                      <div className="text-xs font-semibold mb-2 text-primary">Categories</div>
+                      <div className="max-h-48 overflow-y-auto space-y-1.5">
+                        {availableCategories.map(category => (
+                          <div key={category} className="flex items-center gap-2 py-1 px-1 rounded-md hover:bg-accent/30">
+                            <button
+                              className="flex items-center p-1 bevel-neumorphic rounded-md shadow-subtle"
+                              onClick={() => toggleCategoryFilter(category)}
+                            >
+                              {categoryFilter.includes(category) ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                            <span className="text-xs">{category}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t mt-2 pt-2 flex justify-between">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs shadow-subtle rounded-md" 
+                          onClick={() => setCategoryFilter([])}
+                        >
+                          Clear
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs shadow-subtle rounded-md" 
+                          onClick={() => document.getElementById('categoryFilterDropdown')?.classList.add('hidden')}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {modesToCompare.length > 0 && (
+                    <div className="text-xs flex items-center gap-1 bg-primary/10 border border-primary/20 px-2 py-1 rounded-md bevel-glass shadow-subtle">
+                      <span className="text-primary font-medium">{modesToCompare.length} selected</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0 rounded-full hover:bg-primary/20" 
+                        onClick={() => setModesToCompare([])}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                {modesToCompare.length >= 2 && (
+                  <Button 
+                    size="sm" 
+                    onClick={handleCompare}
+                    className="bevel-neumorphic shadow-subtle bg-primary hover:bg-primary/90"
+                  >
+                    Compare
+                  </Button>
+                )}
+              </div>
+              
+              <div className="grid gap-2">
+                {filterModesByCategory(modes.filter(mode => !mode.id.startsWith('custom_'))).map((mode, index) => (
+                  <div 
+                    key={mode.id} 
+                    className={cn(
+                      "relative flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md",
+                      mode.id === activeMode ? "border-primary bg-primary/5 shadow-subtle bevel-glass" : "bg-background/90 shadow-sm bevel-glass",
+                    )}
+                    onClick={() => {
+                      setActiveMode(mode.id);
+                      setShowModeDialog(false);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleModeForComparison(mode.id);
+                        }}
+                        className="flex-shrink-0 bevel-neumorphic p-1 rounded-md shadow-subtle"
+                      >
+                        {modesToCompare.includes(mode.id) ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">{getLucideIcon(mode.icon, "lg")}</span>
+                    </div>
+                    <div className="flex-1 mr-12">
+                      <h3 className="font-medium">{mode.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{mode.description}</p>
+                    </div>
+                    <div className="absolute right-3 flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                        e.stopPropagation();
+                        handleExportMode(e, mode);
+                      }} title="Share mode">
+                        <Share2 className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateMode(mode);
+                      }} title="Duplicate">
+                        <Copy className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditMode(mode);
+                      }} title="Customize">
+                        <Settings className="h-4 w-4 text-primary" />
                       </Button>
                     </div>
                   </div>
@@ -1128,187 +1213,185 @@ export default function ModeDropdown() {
               </div>
             </TabsContent>
             
-            <TabsContent value="custom" className="mt-4">
-              <div className="grid gap-4">
-                {customModes.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <select
-                          className="text-xs px-2 py-1 rounded border bg-background"
-                          onChange={(e) => {
-                            const sortBy = e.target.value;
-                            // Implementation would go here
-                          }}
-                        >
-                          <option value="default">Sort: Default</option>
-                          <option value="name">Sort: By Name</option>
-                          <option value="recent">Sort: Most Recent</option>
-                        </select>
-                        
-                        {modesToCompare.length > 0 && (
-                          <div className="text-xs flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md">
-                            <span>{modesToCompare.length} selected</span>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-5 w-5 p-0" 
-                              onClick={() => setModesToCompare([])}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {modesToCompare.length >= 2 && (
-                          <Button 
-                            size="sm" 
-                            onClick={handleCompare}
-                          >
-                            Compare
-                          </Button>
-                        )}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs flex items-center gap-1"
-                          onClick={handleImportCustomModes}
-                          title="Import custom modes"
-                        >
-                          <Upload className="h-3 w-3" />
-                          Import
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs flex items-center gap-1"
-                          onClick={handleExportCustomModes}
-                          title="Export custom modes"
-                        >
-                          <Download className="h-3 w-3" />
-                          Export
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {customModes.map((mode, index) => (
-                      <div 
-                        key={mode.id} 
-                        className={cn(
-                          "flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer",
-                          modesToCompare.includes(mode.id) && "border-primary bg-blue-50 dark:bg-blue-900/20"
-                        )}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/plain', mode.id);
-                          e.currentTarget.classList.add('opacity-50');
-                        }}
-                        onDragEnd={(e) => {
-                          e.currentTarget.classList.remove('opacity-50');
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.currentTarget.classList.add('bg-blue-50');
-                        }}
-                        onDragLeave={(e) => {
-                          e.currentTarget.classList.remove('bg-blue-50');
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.currentTarget.classList.remove('bg-blue-50');
-                          const draggedId = e.dataTransfer.getData('text/plain');
-                          const allModeIds = modes.map(m => m.id);
-                          const draggedIndex = allModeIds.indexOf(draggedId);
-                          const targetIndex = allModeIds.indexOf(mode.id);
-                          
-                          if (draggedIndex !== -1 && targetIndex !== -1) {
-                            const newOrderedIds = [...allModeIds];
-                            newOrderedIds.splice(draggedIndex, 1);
-                            newOrderedIds.splice(targetIndex, 0, draggedId);
-                            reorderModes(newOrderedIds);
-                          }
-                        }}
-                        onClick={() => {
-                          setActiveMode(mode.id);
-                          setShowModeDialog(false);
-                        }}
-                      >
-                        <div className="cursor-grab text-gray-400 hover:text-gray-600">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleModeForComparison(mode.id);
-                            }}
-                            className="flex-shrink-0"
-                          >
-                            {modesToCompare.includes(mode.id) ? (
-                              <CheckSquare className="h-4 w-4 text-primary" />
-                            ) : (
-                              <Square className="h-4 w-4 text-gray-400" />
-                            )}
-                          </button>
-                          <span className="text-2xl">{getLucideIcon(mode.icon, "lg")}</span>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium">{mode.name}</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{mode.description}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={(e) => {
-                            e.stopPropagation();
-                            handleExportMode(e, mode);
-                          }} title="Share mode">
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditMode(mode);
-                          }} title="Edit">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`Are you sure you want to delete "${mode.name}"?`)) {
-                              handleDeleteMode(mode.id);
-                            }
-                          }} title="Delete">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                    <p>You haven't created any custom modes yet.</p>
-                    <div className="flex flex-col gap-2 items-center mt-2">
-                      <Button onClick={handleCreateMode}>
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create a Mode
-                      </Button>
+            <TabsContent value="custom" className="mt-4 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <select
+                    className="text-xs px-2 py-1 rounded border bg-background/80 shadow-subtle backdrop-blur-sm"
+                    onChange={(e) => {
+                      const sortBy = e.target.value;
+                      // Implementation would go here
+                    }}
+                  >
+                    <option value="default">Sort: Default</option>
+                    <option value="name">Sort: By Name</option>
+                    <option value="recent">Sort: Most Recent</option>
+                  </select>
+                  
+                  {modesToCompare.length > 0 && (
+                    <div className="text-xs flex items-center gap-1 bg-primary/10 border border-primary/20 px-2 py-1 rounded-md bevel-glass shadow-subtle">
+                      <span className="text-primary font-medium">{modesToCompare.length} selected</span>
                       <Button 
-                        variant="outline" 
-                        onClick={handleImportCustomModes}
-                        className="mt-2"
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0 rounded-full hover:bg-primary/20" 
+                        onClick={() => setModesToCompare([])}
                       >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import Modes
+                        <X className="h-3 w-3" />
                       </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  {modesToCompare.length >= 2 && (
+                    <Button 
+                      size="sm" 
+                      onClick={handleCompare}
+                      className="bevel-neumorphic shadow-subtle bg-primary hover:bg-primary/90"
+                    >
+                      Compare
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs flex items-center gap-1 bevel-neumorphic shadow-subtle"
+                    onClick={handleImportCustomModes}
+                    title="Import custom modes"
+                  >
+                    <Upload className="h-3 w-3" />
+                    Import
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs flex items-center gap-1 bevel-neumorphic shadow-subtle"
+                    onClick={handleExportCustomModes}
+                    title="Export custom modes"
+                  >
+                    <Download className="h-3 w-3" />
+                    Export
+                  </Button>
+                </div>
               </div>
+              
+              {customModes.length > 0 ? (
+                <div className="grid gap-2">
+                  {customModes.map((mode, index) => (
+                    <div 
+                      key={mode.id} 
+                      className={cn(
+                        "relative flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md",
+                        mode.id === activeMode ? "border-primary bg-primary/5 shadow-subtle bevel-glass" : "bg-background/90 shadow-sm bevel-glass",
+                      )}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', mode.id);
+                        e.currentTarget.classList.add('opacity-50');
+                      }}
+                      onDragEnd={(e) => {
+                        e.currentTarget.classList.remove('opacity-50');
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.add('bg-accent/30');
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('bg-accent/30');
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-accent/30');
+                        const draggedId = e.dataTransfer.getData('text/plain');
+                        const allModeIds = modes.map(m => m.id);
+                        const draggedIndex = allModeIds.indexOf(draggedId);
+                        const targetIndex = allModeIds.indexOf(mode.id);
+                        
+                        if (draggedIndex !== -1 && targetIndex !== -1) {
+                          const newOrderedIds = [...allModeIds];
+                          newOrderedIds.splice(draggedIndex, 1);
+                          newOrderedIds.splice(targetIndex, 0, draggedId);
+                          reorderModes(newOrderedIds);
+                        }
+                      }}
+                      onClick={() => {
+                        setActiveMode(mode.id);
+                        setShowModeDialog(false);
+                      }}
+                    >
+                      <div className="cursor-grab text-muted-foreground hover:text-foreground">
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleModeForComparison(mode.id);
+                          }}
+                          className="flex-shrink-0 bevel-neumorphic p-1 rounded-md shadow-subtle"
+                        >
+                          {modesToCompare.includes(mode.id) ? (
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">{getLucideIcon(mode.icon, "lg")}</span>
+                      </div>
+                      <div className="flex-1 mr-12">
+                        <h3 className="font-medium">{mode.name}</h3>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{mode.description}</p>
+                      </div>
+                      <div className="absolute right-3 flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                          e.stopPropagation();
+                          handleExportMode(e, mode);
+                        }} title="Share mode">
+                          <Share2 className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditMode(mode);
+                        }} title="Edit">
+                          <Edit className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shadow-subtle hover:bg-accent/30 rounded-full bevel-neumorphic" onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Are you sure you want to delete "${mode.name}"?`)) {
+                            handleDeleteMode(mode.id);
+                          }
+                        }} title="Delete">
+                          <X className="h-4 w-4 text-primary" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center border rounded-lg bg-background/90 shadow-sm bevel-glass">
+                  <p className="text-muted-foreground mb-4">You haven't created any custom modes yet.</p>
+                  <div className="flex flex-col gap-2 items-center mt-2">
+                    <Button onClick={handleCreateMode} className="shadow-subtle bevel-neumorphic">
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Create a Mode
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleImportCustomModes}
+                      className="mt-2 shadow-subtle bevel-neumorphic"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import Modes
+                    </Button>
+                  </div>
+                </div>
+              )}
               
               {customModes.length > 0 && (
                 <div className="space-y-2 mt-4">
                   <Button 
-                    className="w-full"
-                    variant="outline"
+                    className="w-full shadow-subtle bevel-neumorphic bg-primary hover:bg-primary/90"
                     onClick={handleCreateMode}
                   >
                     <PlusCircle className="h-4 w-4 mr-2" />
@@ -1318,43 +1401,43 @@ export default function ModeDropdown() {
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button 
-                        variant="ghost" 
-                        className="w-full flex items-center justify-center gap-2"
+                        variant="outline" 
+                        className="w-full flex items-center justify-center gap-2 shadow-subtle bevel-neumorphic"
                       >
                         <Download className="h-4 w-4" />
                         <span>Backup & Restore</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px] bg-background border border-border">
+                    <DialogContent className="sm:max-w-[425px] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
                       <DialogHeader>
-                        <DialogTitle>Backup & Restore</DialogTitle>
+                        <DialogTitle className="text-xl font-semibold">Backup & Restore</DialogTitle>
                       </DialogHeader>
                       
                       <div className="grid gap-4 py-4">
-                        <div className="border p-4 rounded-lg">
+                        <div className="border p-4 rounded-lg bg-background/60 backdrop-blur-sm shadow-sm bevel-glass">
                           <h3 className="font-medium text-sm mb-2">Backup All Modes</h3>
-                          <p className="text-xs text-gray-500 mb-3">
+                          <p className="text-xs text-muted-foreground mb-3">
                             Create a complete backup of all your modes, including presets, custom modes, favorites, and settings.
                           </p>
                           <Button 
                             onClick={handleBackupAllModes}
-                            className="w-full"
+                            className="w-full shadow-subtle bevel-neumorphic"
                           >
                             <Download className="h-4 w-4 mr-2" />
                             Create Backup
                           </Button>
                         </div>
                         
-                        <div className="border p-4 rounded-lg">
+                        <div className="border p-4 rounded-lg bg-background/60 backdrop-blur-sm shadow-sm bevel-glass">
                           <h3 className="font-medium text-sm mb-2">Restore From Backup</h3>
-                          <p className="text-xs text-gray-500 mb-3">
+                          <p className="text-xs text-muted-foreground mb-3">
                             Restore all modes and settings from a previously created backup file.
                             <span className="block mt-1 text-amber-500 font-medium">Warning: This will replace all your current modes!</span>
                           </p>
                           <Button 
                             onClick={handleRestoreAllModes}
                             variant="outline"
-                            className="w-full"
+                            className="w-full shadow-subtle bevel-neumorphic"
                           >
                             <Upload className="h-4 w-4 mr-2" />
                             Restore Backup
@@ -1372,9 +1455,9 @@ export default function ModeDropdown() {
       
       {/* Mode Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[600px] lg:max-w-[800px] bg-background border border-border">
+        <DialogContent className="sm:max-w-[600px] lg:max-w-[800px] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
           <DialogHeader>
-            <DialogTitle>{editedMode?.id.startsWith('custom_') ? 'Edit Custom Mode' : 'Customize Mode'}</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">{editedMode?.id.startsWith('custom_') ? 'Edit Custom Mode' : 'Customize Mode'}</DialogTitle>
           </DialogHeader>
           
           {editedMode && (
@@ -1383,12 +1466,12 @@ export default function ModeDropdown() {
                 <div className="grid grid-cols-4 gap-4">
                   <div className="col-span-1">
                     <label className="text-sm font-medium">Icon</label>
-                    <div className="mt-1 p-2 border rounded-md text-center">
+                    <div className="mt-1 p-2 border rounded-md text-center bg-background/60 backdrop-blur-sm shadow-sm bevel-glass">
                       <span className="text-3xl">{getLucideIcon(editedMode.icon, "lg")}</span>
                     </div>
                     <div className="mt-2 relative">
                       <Input
-                        className="pr-8"
+                        className="pr-8 shadow-subtle"
                         value={editedMode.icon}
                         onChange={(e) => setEditedMode({...editedMode, icon: e.target.value})}
                         maxLength={2}
@@ -1401,19 +1484,19 @@ export default function ModeDropdown() {
                           const emoji = commonEmojis[Math.floor(Math.random() * commonEmojis.length)];
                           setEditedMode({...editedMode, icon: emoji});
                         }}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         title="Pick random emoji"
                       >
                         🎲
                       </button>
                     </div>
-                    <div className="mt-2 grid grid-cols-7 gap-1">
+                    <div className="mt-2 grid grid-cols-7 gap-1 p-2 border rounded-md bg-background/60 backdrop-blur-sm shadow-sm bevel-glass">
                       {["💬", "🔍", "⚖️", "📝", "👨‍🏫", "🎯", "💼", "✍️", "💻", "📊", "🧠", "🗣️", "📈", "🎨", "📋", "🤖", "🔧", "📚", "💡", "🔬", "⭐"].map(emoji => (
                         <button
                           key={emoji}
                           type="button"
                           onClick={() => setEditedMode({...editedMode, icon: emoji})}
-                          className="p-1 hover:bg-gray-100 rounded"
+                          className="p-1 hover:bg-accent/30 rounded"
                         >
                           {emoji}
                         </button>
@@ -1424,7 +1507,7 @@ export default function ModeDropdown() {
                   <div className="col-span-3">
                     <label className="text-sm font-medium">Name</label>
                     <Input
-                      className="mt-1"
+                      className="mt-1 shadow-subtle"
                       value={editedMode.name}
                       onChange={(e) => setEditedMode({...editedMode, name: e.target.value})}
                       placeholder="Mode name"
@@ -1432,7 +1515,7 @@ export default function ModeDropdown() {
                     
                     <label className="text-sm font-medium block mt-4">Description</label>
                     <Input
-                      className="mt-1"
+                      className="mt-1 shadow-subtle"
                       value={editedMode.description}
                       onChange={(e) => setEditedMode({...editedMode, description: e.target.value})}
                       placeholder="Short description"
@@ -1442,7 +1525,7 @@ export default function ModeDropdown() {
                       <div>
                         <label className="text-sm font-medium block">Category</label>
                         <select
-                          className="w-full mt-1 px-3 py-2 bg-background border border-input rounded-md"
+                          className="w-full mt-1 px-3 py-2 bg-background/80 border border-input rounded-md shadow-subtle backdrop-blur-sm"
                           value={editedMode.category || 'General'}
                           onChange={(e) => setEditedMode({...editedMode, category: e.target.value})}
                         >
@@ -1455,7 +1538,7 @@ export default function ModeDropdown() {
                       </div>
                       <div>
                         <label className="text-sm font-medium flex items-center gap-2">
-                          <Thermometer className="h-4 w-4" />
+                          <Thermometer className="h-4 w-4 text-primary" />
                           Temperature: {editedMode.temperature.toFixed(1)}
                         </label>
                         <input
@@ -1467,7 +1550,7 @@ export default function ModeDropdown() {
                           onChange={(e) => setEditedMode({...editedMode, temperature: parseFloat(e.target.value)})}
                           className="w-full mt-1"
                         />
-                        <div className="flex justify-between text-xs text-gray-500">
+                        <div className="flex justify-between text-xs text-muted-foreground">
                           <span>Precise</span>
                           <span>Creative</span>
                         </div>
@@ -1478,11 +1561,11 @@ export default function ModeDropdown() {
                 
                 <div>
                   <label className="text-sm font-medium flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
+                    <Tag className="h-4 w-4 text-primary" />
                     Tags
                   </label>
                   <Input
-                    className="mt-1"
+                    className="mt-1 shadow-subtle"
                     value={editedMode.tags ? editedMode.tags.join(', ') : ''}
                     onChange={(e) => setEditedMode({
                       ...editedMode, 
@@ -1494,10 +1577,10 @@ export default function ModeDropdown() {
                 
                 <div>
                   <label className="text-sm font-medium flex items-center gap-2">
-                    <Sliders className="h-4 w-4" />
+                    <Sliders className="h-4 w-4 text-primary" />
                     Advanced Settings
                   </label>
-                  <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="grid grid-cols-2 gap-4 mt-2 p-3 border rounded-lg bg-background/60 backdrop-blur-sm shadow-sm bevel-glass">
                     <div>
                       <label className="text-xs">Max Tokens</label>
                       <Input
@@ -1615,18 +1698,11 @@ export default function ModeDropdown() {
                 </div>
               </div>
               
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditDialog(false);
-                    setEditedMode(null);
-                  }}
-                >
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" className="shadow-subtle bevel-neumorphic" onClick={() => setShowEditDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveMode}>
-                  <Save className="h-4 w-4 mr-2" />
+                <Button className="shadow-subtle bevel-neumorphic bg-primary hover:bg-primary/90" onClick={handleSaveMode}>
                   Save Mode
                 </Button>
               </div>
@@ -1637,18 +1713,18 @@ export default function ModeDropdown() {
       
       {/* Template Selection Dialog */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="sm:max-w-[450px] bg-background border border-border">
+        <DialogContent className="sm:max-w-[450px] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
           <DialogHeader>
-            <DialogTitle>Choose a Template</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Choose a Template</DialogTitle>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
-            <div className="flex justify-between">
-              <p className="text-sm text-gray-500">Select a template to start with or create a blank mode:</p>
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-muted-foreground">Select a template to start with or create a blank mode:</p>
               <Button
                 variant="outline"
                 size="sm"
-                className="text-xs flex items-center gap-1"
+                className="text-xs flex items-center gap-1 bevel-neumorphic shadow-subtle"
                 onClick={(e) => handleImportSingleMode(e)}
               >
                 <ArrowDownCircle className="h-3 w-3 mr-1" />
@@ -1657,271 +1733,218 @@ export default function ModeDropdown() {
             </div>
             
             <div 
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md bg-background/90 shadow-sm bevel-glass cursor-pointer"
               onClick={() => handleTemplateSelect('blank')}
             >
-              <span className="text-2xl">✨</span>
+              <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">✨</span>
               <div className="flex-1">
                 <h3 className="font-medium">Blank Mode</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Start from scratch with an empty template</p>
+                <p className="text-sm text-muted-foreground">Start from scratch with an empty template</p>
               </div>
             </div>
             
             <div 
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md bg-background/90 shadow-sm bevel-glass cursor-pointer"
               onClick={() => handleTemplateSelect('creative')}
             >
-              <span className="text-2xl">🎨</span>
+              <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">🎨</span>
               <div className="flex-1">
                 <h3 className="font-medium">Creative Assistant</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">For creative writing and brainstorming</p>
+                <p className="text-sm text-muted-foreground">For creative writing and brainstorming</p>
               </div>
             </div>
             
             <div 
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md bg-background/90 shadow-sm bevel-glass cursor-pointer"
               onClick={() => handleTemplateSelect('professional')}
             >
-              <span className="text-2xl">💼</span>
+              <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">💼</span>
               <div className="flex-1">
                 <h3 className="font-medium">Professional Assistant</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">For business writing and communication</p>
+                <p className="text-sm text-muted-foreground">For business writing and communication</p>
               </div>
             </div>
             
             <div 
-              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent/30 transition-all backdrop-blur-md bg-background/90 shadow-sm bevel-glass cursor-pointer"
               onClick={() => handleTemplateSelect('technical')}
             >
-              <span className="text-2xl">💻</span>
+              <span className="text-2xl p-2 bg-primary/10 rounded-full bevel-neumorphic shadow-subtle">💻</span>
               <div className="flex-1">
                 <h3 className="font-medium">Technical Expert</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">For technical explanations and problem-solving</p>
+                <p className="text-sm text-muted-foreground">For technical explanations and problem-solving</p>
               </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
       
-      {/* Mode Comparison Dialog */}
+      {/* Compare Modes Dialog */}
       <Dialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
-        <DialogContent className="sm:max-w-[900px] lg:max-w-[1000px] bg-background border border-border">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
           <DialogHeader>
-            <DialogTitle>Compare Assistant Modes</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Compare Assistant Modes</DialogTitle>
           </DialogHeader>
           
-          <div className="max-h-[70vh] overflow-y-auto py-4">
-            <div className="grid" style={{ gridTemplateColumns: `150px repeat(${modesToCompare.length}, 1fr)` }}>
-              {/* Header row */}
-              <div className="p-2 font-medium"></div>
+          <div className="overflow-auto" style={{ maxHeight: "calc(90vh - 10rem)" }}>
+            <div className="grid grid-cols-1 gap-4">
               {modesToCompare.map(modeId => {
                 const mode = modes.find(m => m.id === modeId);
                 if (!mode) return null;
+                
                 return (
-                  <div key={mode.id} className="p-2 text-center border-l">
-                    <div className="flex flex-col items-center mb-2">
-                      <span className="text-2xl mb-1">{getLucideIcon(mode.icon, "lg")}</span>
-                      <h3 className="font-medium">{mode.name}</h3>
+                  <div 
+                    key={modeId}
+                    className="border p-4 rounded-lg bg-background/60 backdrop-blur-sm shadow-sm bevel-glass"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">{getLucideIcon(mode.icon, "lg")}</span>
+                      <h3 className="font-medium text-lg">{mode.name}</h3>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="ml-auto shadow-subtle bevel-neumorphic p-0 w-8 h-8 rounded-full"
+                        onClick={() => {
+                          setModesToCompare(modesToCompare.filter(id => id !== modeId));
+                        }}
+                      >
+                        <X className="h-4 w-4 text-primary" />
+                      </Button>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{mode.description}</p>
-                  </div>
-                );
-              })}
-              
-              {/* Properties rows */}
-              <div className="p-2 font-medium bg-gray-50 dark:bg-gray-800">Category</div>
-              {modesToCompare.map(modeId => {
-                const mode = modes.find(m => m.id === modeId);
-                if (!mode) return null;
-                return (
-                  <div key={`category-${mode.id}`} className="p-2 border-l bg-gray-50 dark:bg-gray-800">
-                    {mode.category || 'General'}
-                  </div>
-                );
-              })}
-              
-              <div className="p-2 font-medium">Temperature</div>
-              {modesToCompare.map(modeId => {
-                const mode = modes.find(m => m.id === modeId);
-                if (!mode) return null;
-                return (
-                  <div key={`temp-${mode.id}`} className="p-2 border-l">
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium">{mode.temperature.toFixed(1)}</span>
-                      <span className="text-xs text-gray-500">
-                        {mode.temperature <= 0.3 ? 'Precise' : 
-                         mode.temperature <= 0.7 ? 'Balanced' : 'Creative'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              <div className="p-2 font-medium bg-gray-50 dark:bg-gray-800">Tags</div>
-              {modesToCompare.map(modeId => {
-                const mode = modes.find(m => m.id === modeId);
-                if (!mode) return null;
-                return (
-                  <div key={`tags-${mode.id}`} className="p-2 border-l bg-gray-50 dark:bg-gray-800">
-                    <div className="flex flex-wrap gap-1">
-                      {mode.tags?.map(tag => (
-                        <span 
-                          key={tag} 
-                          className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              
-              <div className="p-2 font-medium">System Prompt</div>
-              {modesToCompare.map(modeId => {
-                const mode = modes.find(m => m.id === modeId);
-                if (!mode) return null;
-                return (
-                  <div key={`prompt-${mode.id}`} className="p-2 border-l">
-                    <details>
-                      <summary className="cursor-pointer text-sm text-blue-500">View prompt</summary>
-                      <div className="mt-2 p-2 text-xs bg-gray-50 dark:bg-gray-800 rounded border max-h-[300px] overflow-y-auto whitespace-pre-wrap">
-                        {mode.systemPrompt}
+                    
+                    <div className="pl-8 space-y-2">
+                      <p className="text-sm text-muted-foreground">{mode.description}</p>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div className="text-sm">
+                          <span className="font-medium">Category:</span> {mode.category || 'General'}
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-medium">Temperature:</span> {mode.temperature}
+                        </div>
                       </div>
-                    </details>
-                  </div>
-                );
-              })}
-              
-              <div className="p-2 font-medium bg-gray-50 dark:bg-gray-800">Advanced Settings</div>
-              {modesToCompare.map(modeId => {
-                const mode = modes.find(m => m.id === modeId);
-                if (!mode) return null;
-                return (
-                  <div key={`advanced-${mode.id}`} className="p-2 border-l bg-gray-50 dark:bg-gray-800">
-                    <div className="space-y-1 text-xs">
-                      <div><span className="font-medium">Max Tokens:</span> {mode.maxTokens || 2048}</div>
-                      <div><span className="font-medium">Top P:</span> {mode.topP || 0.9}</div>
-                      {mode.frequencyPenalty !== undefined && 
-                        <div><span className="font-medium">Frequency Penalty:</span> {mode.frequencyPenalty}</div>}
-                      {mode.presencePenalty !== undefined && 
-                        <div><span className="font-medium">Presence Penalty:</span> {mode.presencePenalty}</div>}
+                      
+                      {mode.tags && mode.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {mode.tags.map(tag => (
+                            <span key={tag} className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary shadow-subtle bevel-neumorphic">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="prose prose-sm mt-4 border-t pt-2">
+                        <div className="bg-muted/50 p-2 rounded text-sm font-mono overflow-x-auto shadow-subtle">
+                          {mode.systemPrompt}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            
-            <div className="flex justify-between mt-6">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowCompareDialog(false)}
-              >
-                Close
-              </Button>
-              <div className="space-x-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    if (modesToCompare.length > 0) {
-                      setActiveMode(modesToCompare[0]);
-                      setShowCompareDialog(false);
-                      setShowModeDialog(false);
-                    }
-                  }}
-                  disabled={modesToCompare.length === 0}
-                >
-                  Use {modesToCompare.length > 0 ? modes.find(m => m.id === modesToCompare[0])?.name : 'Selected'}
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (modesToCompare.length > 0) {
-                      const baseMode = modes.find(m => m.id === modesToCompare[0]);
-                      if (baseMode) {
-                        handleDuplicateMode(baseMode);
-                        setShowCompareDialog(false);
-                      }
-                    }
-                  }}
-                  disabled={modesToCompare.length === 0}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Duplicate Selected
-                </Button>
-              </div>
-            </div>
+          </div>
+          
+          <div className="flex justify-between mt-6">
+            <Button variant="outline" className="shadow-subtle bevel-neumorphic" onClick={() => setShowCompareDialog(false)}>
+              Close
+            </Button>
+            <Button variant="outline" className="shadow-subtle bevel-neumorphic" onClick={() => setModesToCompare([])}>
+              Clear All
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
       
-      {/* AI Prompt Helper Dialog */}
+      {/* AI Template Generator Dialog */}
       <Dialog open={showAIHelperDialog} onOpenChange={setShowAIHelperDialog}>
-        <DialogContent className="sm:max-w-[525px] bg-background border border-border">
+        <DialogContent className="sm:max-w-[600px] bg-background/95 border border-border backdrop-blur-md shadow-3d bevel-glass">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-yellow-400" />
-              AI Prompt Helper
+            <DialogTitle className="text-xl font-semibold">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Template Generator
+              </div>
             </DialogTitle>
           </DialogHeader>
           
-          <div className="py-4">
-            <p className="text-sm text-gray-500 mb-4">
-              Let our AI help you create an effective system prompt for your assistant mode. Customize the options below to get a tailored prompt.
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Let AI help you create a tailored system prompt for your custom mode.
             </p>
             
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Assistant Purpose</label>
-                <select
-                  className="w-full mt-1 px-3 py-2 bg-background border border-input rounded-md"
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Purpose of the assistant</label>
+                <select 
+                  className="w-full px-3 py-2 bg-background/80 border border-input rounded-md shadow-subtle backdrop-blur-sm"
                   value={aiHelperOptions.purpose}
                   onChange={(e) => setAIHelperOptions({...aiHelperOptions, purpose: e.target.value})}
                 >
                   <option value="general">General Assistant</option>
+                  <option value="writing">Writing Assistant</option>
+                  <option value="coding">Coding Assistant</option>
+                  <option value="research">Research Assistant</option>
                   <option value="creative">Creative Assistant</option>
                   <option value="educational">Educational Assistant</option>
-                  <option value="professional">Professional Consultant</option>
-                  <option value="technical">Technical Expert</option>
-                  <option value="conversational">Conversational Companion</option>
+                  <option value="business">Business Assistant</option>
+                  <option value="custom">Custom (Describe below)</option>
                 </select>
               </div>
               
-              <div>
-                <label className="text-sm font-medium">Communication Style</label>
-                <select
-                  className="w-full mt-1 px-3 py-2 bg-background border border-input rounded-md"
+              {aiHelperOptions.purpose === 'custom' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Describe the specific goal</label>
+                  <Input 
+                    value={aiHelperOptions.customGoal}
+                    onChange={(e) => setAIHelperOptions({...aiHelperOptions, customGoal: e.target.value})}
+                    placeholder="e.g., Help me generate creative story ideas"
+                    className="shadow-subtle"
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Communication style</label>
+                <select 
+                  className="w-full px-3 py-2 bg-background/80 border border-input rounded-md shadow-subtle backdrop-blur-sm"
                   value={aiHelperOptions.style}
                   onChange={(e) => setAIHelperOptions({...aiHelperOptions, style: e.target.value})}
                 >
                   <option value="balanced">Balanced</option>
-                  <option value="formal">Formal</option>
-                  <option value="casual">Casual</option>
-                  <option value="technical">Technical</option>
+                  <option value="formal">Formal & Professional</option>
+                  <option value="casual">Casual & Friendly</option>
+                  <option value="technical">Technical & Detailed</option>
+                  <option value="simple">Simple & Concise</option>
+                  <option value="creative">Creative & Expressive</option>
                 </select>
               </div>
               
-              <div>
-                <label className="text-sm font-medium">Response Length</label>
-                <select
-                  className="w-full mt-1 px-3 py-2 bg-background border border-input rounded-md"
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Response length preference</label>
+                <select 
+                  className="w-full px-3 py-2 bg-background/80 border border-input rounded-md shadow-subtle backdrop-blur-sm"
                   value={aiHelperOptions.length}
                   onChange={(e) => setAIHelperOptions({...aiHelperOptions, length: e.target.value})}
                 >
-                  <option value="medium">Balanced Length</option>
-                  <option value="concise">Concise</option>
-                  <option value="detailed">Detailed</option>
+                  <option value="concise">Concise (Brief responses)</option>
+                  <option value="medium">Medium (Balanced detail)</option>
+                  <option value="detailed">Detailed (Comprehensive)</option>
                 </select>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="includeExamples"
                   checked={aiHelperOptions.includeExamples}
                   onChange={(e) => setAIHelperOptions({...aiHelperOptions, includeExamples: e.target.checked})}
-                  className="rounded border-gray-300"
+                  className="shadow-subtle"
                 />
-                <label htmlFor="includeExamples" className="text-sm">Include response examples</label>
+                <label htmlFor="includeExamples" className="text-sm">
+                  Include examples in the prompt
+                </label>
               </div>
               
               <div>
@@ -1936,26 +1959,30 @@ export default function ModeDropdown() {
               </div>
             </div>
             
-            <div className="flex gap-3 justify-end mt-6">
-              <Button
-                variant="outline"
+            <div className="flex justify-between">
+              <Button 
+                variant="outline" 
+                className="shadow-subtle bevel-neumorphic"
                 onClick={() => setShowAIHelperDialog(false)}
               >
                 Cancel
               </Button>
-              <Button
+              <Button 
+                className="shadow-subtle bevel-neumorphic bg-primary hover:bg-primary/90"
                 onClick={generateAIPrompt}
                 disabled={isGeneratingPrompt}
-                className="gap-2"
               >
                 {isGeneratingPrompt ? (
                   <>
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-30 border-t-white rounded-full"></div>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                     Generating...
                   </>
                 ) : (
                   <>
-                    <Wand2 className="h-4 w-4" />
+                    <Wand2 className="h-4 w-4 mr-2" />
                     Generate Prompt
                   </>
                 )}

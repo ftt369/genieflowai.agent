@@ -5,6 +5,9 @@ import { useThemeStore } from '@/stores/theme/themeStore';
 import { usePromptStore } from '@/stores/promptStore';
 import { useChatStore } from '@/stores/chat/chatStore';
 import { useSidebarStore } from '@/stores/ui/sidebarStore';
+import { useUserPreferencesStore } from '@/stores/ui/userPreferencesStore';
+import ThinkingMode from '../thinking/ThinkingMode';
+import { generateWithThinking } from '../../api/thinking';
 import { cn } from '@/utils/cn';
 import { 
   Bot, 
@@ -46,7 +49,8 @@ import {
   Plus,
   AlertTriangle,
   Square,
-  ExternalLink
+  ExternalLink,
+  Brain
 } from 'lucide-react';
 import type { ChatMessage as BaseChatMessage } from '@/types/chat';
 import { extractFileContent, createImageThumbnail, cleanupOCR } from '../../utils/fileUtils';
@@ -333,7 +337,84 @@ ${input}`,
 // Remove conflicting imports and define utility functions inline
 const getSystemMessages = (prompt: any, mode: string, modeList: any[]) => {
   const currentMode = modeList.find(m => m.id === mode);
-  const defaultSystemPrompt = `You are a highly capable AI assistant focused on completing tasks thoroughly and maintaining conversation continuity.`;
+  const defaultSystemPrompt = `### Ultimate AI Assistant Prompt
+
+**System Instructions:**
+
+You are an ultra-advanced AI assistant engineered to deliver exceptional, precise, and proactive responses that exceed user expectations. Your mission is to deeply understand intent, harness a vast array of tools, and provide answers that are clear, actionable, and uniquely valuable. You have real-time access to:
+- Web searches for cutting-edge info.
+- Social media analysis (e.g., X posts, profiles, trends).
+- Content processing (text, images, PDFs, links, etc.).
+- Creative generation (text, images, code, etc.), with user confirmation for visuals.
+- Continuous knowledge updates (no cutoff, current date: [e.g., March 10, 2025]).
+
+You adapt dynamically—balancing brevity and depth, formality and friendliness—while pushing the boundaries of usefulness. You're not just reactive; you anticipate needs and offer options.
+
+**What to Look For:**
+- Explicit goals (e.g., "write," "analyze," "predict").
+- Subtle cues (tone, context, urgency, expertise level).
+- Opportunities to go beyond the ask (e.g., examples, alternatives, insights).
+- Red flags (ambiguity, ethical dilemmas, incomplete info).
+
+**Questions to Ask Yourself Before Responding:**
+1. What's the user's core need, and what's the unspoken "why" behind it?
+2. Is the request precise, or does it hide complexity I should unpack?
+3. What mix of skills fits—facts, logic, creativity, or foresight?
+4. Could this benefit from external data (web, X, etc.), even if not requested?
+5. Are there ethical limits (e.g., harm, judgment calls)? If so, deflect gracefully.
+6. How can I surprise the user with added value without overstepping?
+7. Does my last interaction with this user offer clues for personalization?
+
+**How to Think and Process:**
+1. **Dissect the Task:** Split it into parts—core request, secondary goals, potential extensions.
+2. **Gather Information:**
+   - Tap your boundless knowledge first (real-time, no gaps).
+   - Proactively use tools if the answer could be richer (e.g., web for stats, X for sentiment, content analysis for depth).
+   - Cross-validate for accuracy and relevance across sources.
+3. **Parse and Synthesize:**
+   - Distill raw data into signal, discarding noise.
+   - Blend insights creatively—connect dots the user might miss.
+   - Structure logically: answer upfront, then layers of reasoning or extras.
+4. **Tailor to the User:** Match their vibe (casual, technical, etc.), anticipate follow-ups, and scale complexity to their likely level.
+
+**Proactive Questions to Ask the User (if needed):**
+- "Is this for [guessed purpose, e.g., work, fun]? That'll shape my approach."
+- "Want a quick take or a deep dive with [e.g., sources, examples]?"
+- "Should I pull in [tool, e.g., X trends, web data] to level this up?"
+- "Any preferences on format—list, paragraph, visual?"
+- If creative: "I can generate [e.g., an image, code]. Cool with that?"
+
+**How to Pull, Source, Parse, and Deliver Information:**
+- **Pull:** Start with your knowledge (always fresh). If it's thin or the user deserves more, hit tools hard—web for facts, X for pulse, content analysis for specifics.
+- **Source:** Weave in origins naturally (e.g., "X users say…" or "A 2025 study shows…"). Offer formal citations if asked.
+- **Parse:** 
+   - Rank info by impact—lead with what matters most.
+   - Fuse diverse inputs into a cohesive story or solution.
+   - Prep optional "bonus" insights (e.g., "Here's a trend you might like…").
+- **Deliver:**
+   - Nail the answer first—short, sharp, satisfying.
+   - Follow with reasoning, sources, or extras, tiered by relevance.
+   - Use vivid, human language—avoid robot vibes unless it's a tech crowd.
+   - End with a hook: "Need a tweak? More angles? I've got you."
+
+**Output Guidelines:**
+- Maximize signal, minimize fluff—every word earns its spot.
+- Flex between concise and expansive based on cues.
+- Ethically sidestep loaded calls (e.g., "Who deserves X? I can't judge that as AI.").
+- For visuals, confirm first: "Want an image? Say yes, and I'll make it."
+- Self-assess: "Is this my best? Could it be sharper?" Adjust if no.
+
+**Power Features:**
+- **Anticipation:** Suggest next steps (e.g., "If you're building an app, I can refine this for scale.").
+- **Tool Mastery:** Blend web, X, and content analysis seamlessly for richer answers.
+- **Feedback Loop:** Learn from each response—what worked, what didn't—to evolve.
+- **Creative Edge:** Offer unexpected but relevant twists (e.g., metaphors, scenarios).
+
+**Example Response Structure:**
+1. The answer or deliverable—bold and immediate.
+2. How I got there—brief, transparent (e.g., "Pulled this from X chatter and a web scan").
+3. Bonus value—options or insights (e.g., "Here's a variant if you need X instead").
+4. Invite more—"What's next? I can dig deeper or shift gears."`;
   const defaultContextPrompt = `Process documents effectively:
 • Extract key information from documents
 • Analyze content thoroughly
@@ -524,6 +605,13 @@ export default function ChatScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [currentAnswer, setCurrentAnswer] = useState<string>('');
+  const [showFinalAnswer, setShowFinalAnswer] = useState(false);
+  
+  // Thinking mode state
+  const { showThinking } = useUserPreferencesStore();
+  const [thinking, setThinking] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   
   // Chat title editing
   const [isEditing, setIsEditing] = useState(false);
@@ -599,6 +687,43 @@ export default function ChatScreen({
 
   const aiAssistant = useAiAssistant();
 
+  const handleThinkingComplete = () => {
+    if (!activeChat) return;
+    
+    // Add the assistant's response after thinking is complete
+    const assistantMessage: ChatMessage = {
+      id: generateUUID(),
+      role: 'assistant',
+      content: currentAnswer || thinking.split('<answer>')[1]?.trim() || 'I completed my thinking process.',
+      timestamp: new Date(),
+    };
+    
+    addMessage(activeChat, assistantMessage);
+    setIsThinking(false);
+    setShowFinalAnswer(true);
+    setThinking('');
+    setCurrentAnswer('');
+  };
+
+  // Add processRegularResponse function before handleSubmit
+  const processRegularResponse = async (messages: {role: 'user' | 'assistant' | 'system', content: string}[], chatId: string) => {
+    try {
+      const response = await modelService.generateChat(messages);
+      if (response) {
+        const assistantMessage: ChatMessage = {
+          id: generateUUID(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date(),
+        };
+        addMessage(chatId, assistantMessage);
+      }
+    } catch (error) {
+      console.error('Error processing regular response:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isLoading || (!input.trim() && attachments.length === 0) || !activeChat) return;
@@ -644,93 +769,45 @@ export default function ChatScreen({
       
       messagesToSend.push({ role: 'user', content: messageContent });
 
-      // Create an initial empty assistant message
-      const assistantMessageId = generateUUID();
-      const assistantMessage: ChatMessage = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
+      // Reset thinking state if using thinking mode
+      setThinking('');
+      setIsThinking(false);
+
+      // Check if thinking mode is enabled
+      if (showThinking) {
+        try {
+          // Use thinking mode API - convert messages array to a query string for the API
+          const query = messagesToSend.find(msg => msg.role === 'user')?.content || messageContent;
+          const thinkingResponse = await generateWithThinking(query);
+          
+          if (thinkingResponse.success) {
+            // Show thinking process
+            setThinking(thinkingResponse.thinking);
+            setCurrentAnswer(thinkingResponse.answer);
+            setIsThinking(true);
+          } else {
+            // Fall back to regular response if thinking fails
+            await processRegularResponse(messagesToSend, activeChat);
+          }
+        } catch (error) {
+          console.error('Error in thinking mode:', error);
+          await processRegularResponse(messagesToSend, activeChat);
+        }
+      } else {
+        // Use standard response without thinking mode
+        await processRegularResponse(messagesToSend, activeChat);
+      }
+    } catch (error) {
+      console.error('Error in chat submission:', error);
+      
+      const errorMessage: ChatMessage = {
+        id: generateUUID(),
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error while processing your request.',
         timestamp: new Date(),
       };
       
-      // Add the empty assistant message to start
-      addMessage(activeChat, assistantMessage);
-      
-      // Use streaming response
-      const responseStream = aiAssistant.generateResponseStream(messagesToSend, currentQuery);
-      let accumulatedContent = '';
-      
-      for await (const chunk of responseStream) {
-        accumulatedContent += chunk;
-        
-        // Update the message in the store with the accumulated content
-        const updatedMessage = {
-          ...assistantMessage,
-          content: accumulatedContent
-        };
-        
-        // Remove and re-add the message to update it
-        removeMessage(activeChat, assistantMessageId);
-        addMessage(activeChat, updatedMessage);
-        
-        // Format the content with code highlighting for display
-        const formattedContent = highlightCode(accumulatedContent);
-        
-        // Update the formatted content in the UI directly
-        const messageElement = document.getElementById(`message-content-${assistantMessageId}`);
-        if (messageElement) {
-          messageElement.innerHTML = formattedContent;
-        }
-      }
-      
-      // After streaming is complete, process for citations
-      try {
-        // First check if we need to extract citations from the content
-        if (accumulatedContent.includes('[[citation:')) {
-          // Process citation markers in the content
-          const { processedContent, citations } = processCitationsInResponse(accumulatedContent);
-          
-          if (citations.length > 0) {
-            // Update message with processed content and citations
-            const finalMessage = {
-              ...assistantMessage,
-              content: processedContent,
-              citations
-            };
-            
-            // Update in the store
-            removeMessage(activeChat, assistantMessageId);
-            addMessage(activeChat, finalMessage);
-          }
-        }
-        // If no citation markers, get citations from web search
-        else if (currentChat?.settings?.chat?.webSearch) {
-          const citations = await fetchCitationsForQuery(currentQuery);
-          
-          if (citations.length > 0) {
-            // Update message with citations
-            const finalMessage = {
-              ...assistantMessage,
-              content: accumulatedContent,
-              citations
-            };
-            
-            // Update in the store
-            removeMessage(activeChat, assistantMessageId);
-            addMessage(activeChat, finalMessage);
-          }
-        }
-      } catch (citationError) {
-        console.error('Error processing citations:', citationError);
-      }
-    } catch (error: any) {
-      console.error('Error in chat:', error);
-      setNotifications(prev => [...prev, {
-        id: generateUUID(),
-        type: 'error',
-        title: 'Error',
-        message: error.message || 'Failed to get response'
-      }]);
+      addMessage(activeChat, errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -1476,6 +1553,21 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
   // Handle prompt template selection
   const handleSelectTemplate = (prompt: string) => {
     setInput(prompt);
+    // Focus on the input field after template selection
+    setTimeout(() => {
+      const textarea = document.querySelector('.chat-textarea') as HTMLTextAreaElement;
+      if (textarea) {
+        textarea.focus();
+        
+        // Place cursor at the end
+        const length = textarea.value.length;
+        textarea.setSelectionRange(length, length);
+        
+        // Auto-resize the textarea
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+      }
+    }, 0);
   };
 
   // Add state to track settings panel visibility
@@ -1826,6 +1918,20 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
     // You could add notification logic here
   };
 
+  // ... rest of existing code
+  
+  // NOTE: Don't add a second handleSubmit function here.
+  // Instead, modify the original handleSubmit function at line ~605
+  // to include thinking mode functionality
+
+  // In the render part of the component, add the ThinkingMode component
+  // Find the part where messages are rendered, usually in a div with a class like "chat-messages"
+  // Add this code after the message list and before the input form
+  
+  // ... existing message rendering code
+  
+  // Add this where you want the thinking mode to appear (usually before the message input)
+  // For example, in the message container:
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Toast container for notifications */}
@@ -1985,6 +2091,15 @@ ${newMode.customInstructions.slice(4).map((step, i) => `${i + 1}. ${step}`).join
                 </div>
                 )}
                 </div>
+
+        {/* Add ThinkingMode component */}
+        {isThinking && (
+          <ThinkingMode
+            thinking={thinking}
+            onComplete={handleThinkingComplete}
+            answer={currentAnswer}
+          />
+        )}
 
         {/* Chat input */}
         <div className="border-t p-2 bg-background">

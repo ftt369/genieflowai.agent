@@ -247,206 +247,210 @@ export default function MainLayout() {
       <HeaderBar />
       
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar - collapsible */}
-        <div className={cn(
-          "transition-all duration-200 border-r h-full relative",
-          isLeftSidebarCollapsed ? "w-[60px]" : "w-[240px]",
-          "bg-gray-50 border-gray-200"
-        )}>
-          {/* Toggle Button */}
-          <button 
-            className={cn(
-              "absolute top-3 right-3 p-1.5 rounded-full bg-white shadow-sm z-10 border",
-              "text-gray-600 hover:bg-gray-100 border-gray-200"
-            )}
-            onClick={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-          
-          <LeftSidebar 
-            isCollapsed={isLeftSidebarCollapsed}
-            onToggleCollapse={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
-            onShowThemeControls={() => setShowThemeControls(!showThemeControls)}
-            showThemeControls={showThemeControls}
-          />
-        </div>
-        
-        {/* Main Content */}
-        <div 
-          ref={mainContentRef}
-          className={cn(
-            "flex-1 h-full overflow-hidden transition-all duration-200",
-            "bg-gray-50"
-          )}
-          style={{ 
-            width: isRightSidebarOpen 
-              ? `calc(100% - ${isRightSidebarCollapsed ? 28 : rightSidebarWidth}px - ${isLeftSidebarCollapsed ? 60 : 240}px)` 
-              : `calc(100% - ${isLeftSidebarCollapsed ? 60 : 240}px)`,
-            transition: 'width 0.3s ease'
-          }}
-        >
-          <ChatScreen 
-            onMessagesChange={handleChatMessages}
-            isRightSidebarOpen={isRightSidebarOpen}
-            isLeftSidebarCollapsed={isLeftSidebarCollapsed}
-            rightSidebarWidth={isRightSidebarCollapsed ? 28 : rightSidebarWidth}
-            onSidebarInteraction={{
-              search: (handler) => {
-                // Implement search handler
-                return Promise.resolve();
-              },
-              copy: (content) => {
-                navigator.clipboard.writeText(content);
-              },
-              workflow: (content) => {
-                console.log('Creating workflow from: ', content);
-              }
-            }}
-          />
-        </div>
-        
-        {/* Right Sidebar - visible by default */}
-        {isRightSidebarOpen && (
+      <div className="flex flex-1 overflow-hidden relative bg-gradient-to-b from-background/50 to-background">
+        {/* Add subtle background pattern */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none"></div>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar - collapsible */}
           <div className={cn(
-            "h-full relative transition-all duration-300 ease-in-out border-l",
-            isRightSidebarCollapsed 
-              ? "w-[28px] bg-gray-100" 
-              : "bg-white",
-            "border-gray-200"
-          )}
-          style={{ 
-            width: isRightSidebarCollapsed ? "28px" : `${rightSidebarWidth}px`,
-            transition: 'width 0.3s ease'
-          }}
-          >
-            {/* Collapse Tab */}
-            <div 
+            "transition-all duration-200 border-r h-full relative",
+            isLeftSidebarCollapsed ? "w-[60px]" : "w-[240px]",
+            "bg-gray-50 border-gray-200"
+          )}>
+            {/* Toggle Button */}
+            <button 
               className={cn(
-                "absolute top-1/2 left-0 -translate-y-1/2 transform translate-x-[-50%] cursor-pointer z-20",
-                "w-6 h-16 bg-white border rounded-l-md flex items-center justify-center",
-                "shadow-md hover:shadow-lg transition-all",
-                "border-gray-200"
+                "absolute top-3 right-3 p-1.5 rounded-full bg-white shadow-sm z-10 border",
+                "text-gray-600 hover:bg-gray-100 border-gray-200"
               )}
-              onClick={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)}
+              onClick={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
             >
-              {isRightSidebarCollapsed ? (
-                <ChevronLeft className={cn(
-                  "h-4 w-4", 
-                  "text-gray-500"
-                )} />
-              ) : (
-                <ChevronRight className={cn(
-                  "h-4 w-4",
-                  "text-gray-500"
-                )} />
+              <Menu className="h-4 w-4" />
+            </button>
+            
+            <LeftSidebar 
+              isCollapsed={isLeftSidebarCollapsed}
+              onToggleCollapse={() => setIsLeftSidebarCollapsed(!isLeftSidebarCollapsed)}
+              onShowThemeControls={() => setShowThemeControls(!showThemeControls)}
+              showThemeControls={showThemeControls}
+            />
+          </div>
+          
+          {/* Main Content */}
+          <div 
+            ref={mainContentRef}
+            className={cn(
+              "flex-1 h-full overflow-hidden transition-all duration-200",
+              "bg-gray-50"
+            )}
+            style={{ 
+              width: isRightSidebarOpen 
+                ? `calc(100% - ${isRightSidebarCollapsed ? 28 : rightSidebarWidth}px - ${isLeftSidebarCollapsed ? 60 : 240}px)` 
+                : `calc(100% - ${isLeftSidebarCollapsed ? 60 : 240}px)`,
+              transition: 'width 0.3s ease'
+            }}
+          >
+            <ChatScreen 
+              onMessagesChange={handleChatMessages}
+              isRightSidebarOpen={isRightSidebarOpen}
+              isLeftSidebarCollapsed={isLeftSidebarCollapsed}
+              rightSidebarWidth={isRightSidebarCollapsed ? 28 : rightSidebarWidth}
+              onSidebarInteraction={{
+                search: (handler) => {
+                  // Implement search handler
+                  return Promise.resolve();
+                },
+                copy: (content) => {
+                  navigator.clipboard.writeText(content);
+                },
+                workflow: (content) => {
+                  console.log('Creating workflow from: ', content);
+                }
+              }}
+            />
+          </div>
+          
+          {/* Right Sidebar - visible by default */}
+          {isRightSidebarOpen && (
+            <div className={cn(
+              "h-full relative transition-all duration-300 ease-in-out border-l",
+              isRightSidebarCollapsed 
+                ? "w-[28px] bg-gray-100" 
+                : "bg-white",
+              "border-gray-200"
+            )}
+            style={{ 
+              width: isRightSidebarCollapsed ? "28px" : `${rightSidebarWidth}px`,
+              transition: 'width 0.3s ease'
+            }}
+            >
+              {/* Collapse Tab */}
+              <div 
+                className={cn(
+                  "absolute top-1/2 left-0 -translate-y-1/2 transform translate-x-[-50%] cursor-pointer z-20",
+                  "w-6 h-16 bg-white border rounded-l-md flex items-center justify-center",
+                  "shadow-md hover:shadow-lg transition-all",
+                  "border-gray-200"
+                )}
+                onClick={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)}
+              >
+                {isRightSidebarCollapsed ? (
+                  <ChevronLeft className={cn(
+                    "h-4 w-4", 
+                    "text-gray-500"
+                  )} />
+                ) : (
+                  <ChevronRight className={cn(
+                    "h-4 w-4",
+                    "text-gray-500"
+                  )} />
+                )}
+              </div>
+              
+              {/* Collapsed View */}
+              {isRightSidebarCollapsed && (
+                <div className="w-full h-full flex flex-col items-center pt-6 space-y-6">
+                  <button 
+                    className="flex items-center justify-center w-full p-2 focus:outline-none"
+                    onClick={() => {
+                      setActiveTab('chat');
+                      setIsRightSidebarCollapsed(false);
+                    }}
+                  >
+                    <MessageSquare 
+                      className={cn(
+                        "h-4 w-4",
+                        activeTab === 'chat' ? (
+                          "text-primary"
+                        ) : "text-gray-500 hover:text-gray-700"
+                      )} 
+                    />
+                  </button>
+                  <button 
+                    className="flex items-center justify-center w-full p-2 focus:outline-none"
+                    onClick={() => {
+                      setActiveTab('research');
+                      setIsRightSidebarCollapsed(false);
+                    }}
+                  >
+                    <FileText 
+                      className={cn(
+                        "h-4 w-4",
+                        activeTab === 'research' ? (
+                          "text-amber-500"
+                        ) : "text-gray-500 hover:text-gray-700"
+                      )} 
+                    />
+                  </button>
+                  <button 
+                    className="flex items-center justify-center w-full p-2 focus:outline-none"
+                    onClick={() => {
+                      setActiveTab('agent');
+                      setIsRightSidebarCollapsed(false);
+                    }}
+                  >
+                    <SparklesIcon 
+                      className={cn(
+                        "h-4 w-4",
+                        activeTab === 'agent' ? (
+                          "text-green-600"
+                        ) : "text-gray-500 hover:text-gray-700"
+                      )} 
+                    />
+                  </button>
+                  {/* Documents button */}
+                  <button 
+                    className="flex items-center justify-center w-full p-2 focus:outline-none"
+                    onClick={() => {
+                      setActiveTab('documents');
+                      setIsRightSidebarCollapsed(false);
+                    }}
+                  >
+                    <FileText 
+                      className={cn(
+                        "h-4 w-4",
+                        activeTab === 'documents' ? (
+                          "text-gray-700"
+                        ) : "text-gray-500 hover:text-gray-700"
+                      )} 
+                    />
+                  </button>
+                </div>
+              )}
+              
+              {/* Full Sidebar */}
+              {!isRightSidebarCollapsed && (
+                <RightSidebar 
+                  isOpen={isRightSidebarOpen}
+                  onClose={() => {
+                    setIsRightSidebarOpen(false);
+                    setShowThemeControls(false);
+                  }}
+                  onWidthChange={handleRightSidebarWidthChange}
+                  mainChatMessages={mainChatMessages}
+                  onMainChatInteraction={handleMainChatInteraction}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
+                >
+                  {showThemeControls && (
+                    <div className={cn(
+                      "p-4 border-b",
+                      "border-gray-200"
+                    )}>
+                      <h3 className={cn(
+                        "text-lg font-medium mb-4",
+                        ""
+                      )}>
+                        Appearance
+                      </h3>
+                      <ThemeControls />
+                    </div>
+                  )}
+                </RightSidebar>
               )}
             </div>
-            
-            {/* Collapsed View */}
-            {isRightSidebarCollapsed && (
-              <div className="w-full h-full flex flex-col items-center pt-6 space-y-6">
-                <button 
-                  className="flex items-center justify-center w-full p-2 focus:outline-none"
-                  onClick={() => {
-                    setActiveTab('chat');
-                    setIsRightSidebarCollapsed(false);
-                  }}
-                >
-                  <MessageSquare 
-                    className={cn(
-                      "h-4 w-4",
-                      activeTab === 'chat' ? (
-                        "text-primary"
-                      ) : "text-gray-500 hover:text-gray-700"
-                    )} 
-                  />
-                </button>
-                <button 
-                  className="flex items-center justify-center w-full p-2 focus:outline-none"
-                  onClick={() => {
-                    setActiveTab('research');
-                    setIsRightSidebarCollapsed(false);
-                  }}
-                >
-                  <FileText 
-                    className={cn(
-                      "h-4 w-4",
-                      activeTab === 'research' ? (
-                        "text-amber-500"
-                      ) : "text-gray-500 hover:text-gray-700"
-                    )} 
-                  />
-                </button>
-                <button 
-                  className="flex items-center justify-center w-full p-2 focus:outline-none"
-                  onClick={() => {
-                    setActiveTab('agent');
-                    setIsRightSidebarCollapsed(false);
-                  }}
-                >
-                  <SparklesIcon 
-                    className={cn(
-                      "h-4 w-4",
-                      activeTab === 'agent' ? (
-                        "text-green-600"
-                      ) : "text-gray-500 hover:text-gray-700"
-                    )} 
-                  />
-                </button>
-                {/* Documents button */}
-                <button 
-                  className="flex items-center justify-center w-full p-2 focus:outline-none"
-                  onClick={() => {
-                    setActiveTab('documents');
-                    setIsRightSidebarCollapsed(false);
-                  }}
-                >
-                  <FileText 
-                    className={cn(
-                      "h-4 w-4",
-                      activeTab === 'documents' ? (
-                        "text-gray-700"
-                      ) : "text-gray-500 hover:text-gray-700"
-                    )} 
-                  />
-                </button>
-              </div>
-            )}
-            
-            {/* Full Sidebar */}
-            {!isRightSidebarCollapsed && (
-              <RightSidebar 
-                isOpen={isRightSidebarOpen}
-                onClose={() => {
-                  setIsRightSidebarOpen(false);
-                  setShowThemeControls(false);
-                }}
-                onWidthChange={handleRightSidebarWidthChange}
-                mainChatMessages={mainChatMessages}
-                onMainChatInteraction={handleMainChatInteraction}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              >
-                {showThemeControls && (
-                  <div className={cn(
-                    "p-4 border-b",
-                    "border-gray-200"
-                  )}>
-                    <h3 className={cn(
-                      "text-lg font-medium mb-4",
-                      ""
-                    )}>
-                      Appearance
-                    </h3>
-                    <ThemeControls />
-                  </div>
-                )}
-              </RightSidebar>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

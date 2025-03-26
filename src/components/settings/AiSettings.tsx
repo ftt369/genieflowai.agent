@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useThemeStore } from '@/stores/theme/themeStore';
 import { useModelStore } from '@/stores/model/modelStore';
 import { useModeStore } from '@/stores/model/modeStore';
-import { X, Info, Cpu, Brain, MessageSquare, Clock } from 'lucide-react';
+import { useUserPreferencesStore } from '@/stores/ui/userPreferencesStore';
+import { X, Info, Cpu, Brain, MessageSquare, Clock, BrainCog } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 interface AiSettingsProps {
@@ -14,6 +15,7 @@ export default function AiSettings({ isOpen, onClose }: AiSettingsProps) {
   const { profile } = useThemeStore();
   const { modelService, setModel } = useModelStore();
   const { activeMode, setMode } = useModeStore();
+  const { showThinking, setShowThinking } = useUserPreferencesStore();
   
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [temperature, setTemperature] = useState(0.7);
@@ -55,6 +57,36 @@ export default function AiSettings({ isOpen, onClose }: AiSettingsProps) {
         </div>
         
         <div className="space-y-6 py-4">
+          {/* Thinking Mode Toggle (NEW) */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BrainCog className="w-5 h-5 text-primary" />
+                <h3 className="font-medium">AI Thinking Process</h3>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={showThinking}
+                  onChange={() => setShowThinking(!showThinking)}
+                  className="sr-only peer" 
+                />
+                <div className={cn(
+                  "w-11 h-6 rounded-full transition-colors",
+                  "after:content-[''] after:absolute after:top-[2px] after:left-[2px]",
+                  "after:bg-white after:rounded-full after:h-5 after:w-5",
+                  "after:transition-transform",
+                  "peer-checked:after:translate-x-full",
+                  "peer-checked:bg-primary",
+                  "bg-gray-200 dark:bg-gray-700"
+                )}></div>
+              </label>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Show the AI's thinking process before displaying the final answer. This helps you understand how the AI reaches its conclusions.
+            </p>
+          </div>
+          
           {/* Model Selection */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">

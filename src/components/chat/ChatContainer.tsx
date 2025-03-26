@@ -68,7 +68,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     <div className="chat-container flex flex-col h-full">
       <div className="chat-content flex-1 flex">
         {/* Main chat area */}
-        <div className="chat-messages flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="chat-messages flex-1 overflow-y-auto p-4 space-y-4 bg-opacity-40 backdrop-blur-sm bg-background bevel-glass rounded-md shadow-subtle">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <svg
@@ -99,8 +99,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
                   <div 
                     className={`max-w-3/4 rounded-lg p-3 ${
                       message.role === 'user' 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-muted/40 border border-border'
+                        ? 'bg-primary text-primary-foreground bevel-neumorphic shadow-subtle' 
+                        : 'bg-muted/40 border border-border bevel-glass shadow-3d'
                     }`}
                   >
                     <div className="text-sm whitespace-pre-wrap">{message.content}</div>
@@ -120,7 +120,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
               {/* Show loading indicator if waiting for response */}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-muted/40 border border-border rounded-lg p-3">
+                  <div className="bg-muted/40 border border-border rounded-lg p-3 bevel-glass shadow-subtle">
                     <div className="flex items-center">
                       <div className="animate-pulse flex space-x-1">
                         <div className="h-2 w-2 bg-muted-foreground rounded-full"></div>
@@ -149,19 +149,19 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       </div>
       
       {/* Input area */}
-      <div className="chat-input border-t border-border p-3">
+      <div className="chat-input border-t border-border p-3 bg-gradient-to-r from-muted/30 to-background/60 backdrop-blur-sm rounded-b-md">
         <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={currentDocument ? "Ask about your document..." : "Type a message..."}
-            className="flex-1 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="flex-1 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bevel-glass shadow-inner bg-background/50 backdrop-blur-sm"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="p-2 rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+            className="p-2 rounded-md bg-primary text-primary-foreground disabled:opacity-50 bevel-neumorphic shadow-subtle hover:shadow-none transition-shadow duration-200"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

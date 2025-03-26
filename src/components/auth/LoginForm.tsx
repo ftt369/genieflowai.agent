@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Provider } from '@supabase/supabase-js';
+import { Link, useNavigate } from 'react-router-dom';
 
 const LoginForm: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -10,7 +11,8 @@ const LoginForm: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   
-  const { signIn, signUp, signInWithProvider, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithProvider } = useAuth();
+  const navigate = useNavigate();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,35 +43,12 @@ const LoginForm: React.FC = () => {
     }
   };
   
-  const handleProviderSignIn = async (provider: Provider) => {
+  const handleProviderSignIn = async (provider: 'google' | 'github') => {
     setError(null);
     try {
       await signInWithProvider(provider);
     } catch (err) {
       setError((err as Error).message);
-    }
-  };
-  
-  const handleResetPassword = async () => {
-    if (!email) {
-      setError('Please enter your email address');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { success, error } = await resetPassword(email);
-      if (success) {
-        setMessage('Password reset email sent. Please check your inbox.');
-      } else {
-        setError(error?.message || 'Error sending reset password email');
-      }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
     }
   };
   
@@ -122,13 +101,12 @@ const LoginForm: React.FC = () => {
         
         {!isSignUp && (
           <div className="text-sm">
-            <button
-              type="button"
-              onClick={handleResetPassword}
+            <Link
+              to="/auth/reset-password"
               className="text-blue-600 hover:text-blue-500"
             >
               Forgot your password?
-            </button>
+            </Link>
           </div>
         )}
         

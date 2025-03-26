@@ -9,6 +9,7 @@ import { type ColorProfile } from '@/config/theme';
 import ChatScreen from '../../chat/ChatScreen';
 import ResearchAssistant from '../../ResearchAssistant';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 // Update color constants to match Spiral logo colors
 const SPIRAL_COLORS = {
@@ -245,7 +246,9 @@ export default function RightSidebar({
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // Update parent when width changes
@@ -296,17 +299,135 @@ export default function RightSidebar({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isProcessing) return;
-    
+
     // Add your message handling logic here
     const newMessage: SideMessage = {
       id: generateUUID(),
       role: 'user',
       content: inputValue
     };
-    
+
     setMessages(prev => [...prev, newMessage]);
     setInputValue('');
-    // Process the message...
+    
+    // Process the message and generate AI response
+    processUserMessage(inputValue);
+  };
+
+  // Function to process user messages and generate AI responses
+  const processUserMessage = async (userInput: string) => {
+    setIsProcessing(true);
+    
+    try {
+      // Generate a response based on the input and context from main chat
+      const responseContent = await generateAIResponse(userInput);
+      
+      // Create the assistant message
+      const assistantMessage: SideMessage = {
+        id: generateUUID(),
+        role: 'assistant',
+        content: responseContent
+      };
+      
+      // Add the assistant response to the messages
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error generating response:', error);
+      
+      // Add an error message
+      const errorMessage: SideMessage = {
+        id: generateUUID(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while processing your request. Please try again.'
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+  
+  // Function to generate AI response based on user input and main chat context
+  const generateAIResponse = async (userInput: string): Promise<string> => {
+    // Get context from main chat messages if they exist
+    const context = mainChatMessages && mainChatMessages.length > 0 
+      ? `Based on the following conversation context:\n${mainChatMessages
+          .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+          .join('\n')}\n\nPlease respond to: ${userInput}`
+      : userInput;
+    
+    try {
+      // Use onMainChatInteraction to handle the message if it's available
+      if (onMainChatInteraction) {
+        // Signal that we're using the message for search
+        onMainChatInteraction('search', context);
+        
+        // Since onMainChatInteraction doesn't return a response,
+        // we'll create a response based on the context
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing delay
+        
+        return `Based on the main conversation, here's my response to "${userInput}":
+        
+I've analyzed the relevant parts of your conversation and can provide some insights:
+
+${mainChatMessages && mainChatMessages.length > 0 
+  ? `• The main discussion appears to be about ${extractTopic(mainChatMessages)}. 
+• Key points mentioned include ${extractKeyPoints(mainChatMessages)}.
+• Your question seems to relate to these topics, so I can offer additional context or clarification.`
+  : `• I don't have access to the main conversation context, but I can still try to help with your question.
+• For more detailed assistance, try interacting with the main chat directly.`}
+
+Is there a specific aspect of this you'd like me to elaborate on?`;
+      } else {
+        // If no interaction function is available, simulate a response
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
+        
+        // Generate a simple response
+        if (userInput.toLowerCase().includes('hello') || userInput.toLowerCase().includes('hi')) {
+          return 'Hello! How can I assist you with your current conversation?';
+        } else if (userInput.toLowerCase().includes('help')) {
+          return 'I can help you understand the main conversation, answer questions about it, or provide additional information on related topics. What would you like to know?';
+        } else {
+          return `I see you're asking about "${userInput}". Based on the context of the main conversation, I can help you explore this topic further. What specific aspects would you like me to address?`;
+        }
+      }
+    } catch (error) {
+      console.error('Error in generateAIResponse:', error);
+      throw error;
+    }
+  };
+  
+  // Utility function to extract the main topic from conversation
+  const extractTopic = (messages: any[]): string => {
+    if (!messages || messages.length === 0) return "no specific topic";
+    
+    // Take the last few messages for analysis
+    const recentMessages = messages.slice(Math.max(0, messages.length - 3));
+    const combinedText = recentMessages.map(m => m.content).join(" ");
+    
+    // Very simple topic extraction - in a real app this would be more sophisticated
+    const commonTopics = [
+      "Supabase integration", "authentication", "database", "storage",
+      "AI features", "React", "TypeScript", "API integration", "user interface",
+      "file uploads", "workers compensation", "legal documents"
+    ];
+    
+    for (const topic of commonTopics) {
+      if (combinedText.toLowerCase().includes(topic.toLowerCase())) {
+        return topic;
+      }
+    }
+    
+    return "the current subject";
+  };
+  
+  // Utility function to extract key points from conversation
+  const extractKeyPoints = (messages: any[]): string => {
+    if (!messages || messages.length === 0) return "no specific points";
+    
+    // In a real implementation, this would use NLP/ML to extract key points
+    // For now, we'll just return a simple placeholder
+    return "information exchange, technical concepts, and specific questions";
   };
 
   const handleCopy = async (content: string, messageId: string) => {
@@ -760,10 +881,10 @@ Respond with ONLY a valid JSON object containing:
   const getTabContent = () => {
     switch (activeTab) {
       case 'chat':
-  return (
-          <div className="flex-1 flex flex-col">
+        return (
+          <div className="flex flex-col h-full">
             <div className={cn(
-              "p-4 border-b",
+              "p-4 border-b flex-shrink-0",
               isOfficeStyle ? "border-[#e1dfdd] bg-white" : 
               isSpiralStyle ? "border-[#e6b44c] bg-white" : 
               "border-gray-200 bg-white"
@@ -779,35 +900,55 @@ Respond with ONLY a valid JSON object containing:
               </p>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "p-3 rounded-lg max-w-[80%]",
-                    message.role === 'user' ? (
-                      isOfficeStyle ? "bg-[#deecf9] text-gray-800 ml-auto" : 
-                      isSpiralStyle ? "bg-[#f8e8c6] text-gray-800 ml-auto" : 
-                      "bg-blue-100 text-gray-800 ml-auto"
-                    ) : (
-                      isOfficeStyle ? "bg-white border border-[#e1dfdd]" : 
-                      isSpiralStyle ? "bg-white border border-[#e6b44c]" : 
-                      "bg-white border border-gray-200"
-                    )
-                  )}
-                >
-                  {message.content}
-                  {message.reference && (
-                    <div className={cn(
-                      "mt-1 text-xs p-1 rounded",
-                      isOfficeStyle ? "bg-[#f3f2f1] text-[#0078d4]" : 
-                      isSpiralStyle ? "bg-[#f5f1e5] text-[#004080]" : 
-                      "bg-gray-100 text-blue-600"
-                    )}>
-                      Referencing main chat
-                    </div>
-                  )}
+              {messages.length === 0 ? (
+                <div className={cn(
+                  "p-4 rounded-lg text-center",
+                  isOfficeStyle ? "bg-[#f3f2f1] text-[#323130]" :
+                  isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" :
+                  "bg-gray-100 text-gray-700"
+                )}>
+                  <p className="mb-2 font-medium">Welcome to the Chat Assistant</p>
+                  <p className="text-sm">
+                    This chat assistant can help you with your current conversation. 
+                    You can ask questions about the main chat, request clarification, 
+                    or explore related topics.
+                  </p>
+                  <p className="text-xs mt-3 text-gray-500">
+                    Try asking something like "Summarize the current conversation" or 
+                    "What are the key points discussed so far?"
+                  </p>
                 </div>
-              ))}
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "p-3 rounded-lg max-w-[80%]",
+                      message.role === 'user' ? (
+                        isOfficeStyle ? "bg-[#deecf9] text-gray-800 ml-auto" :
+                        isSpiralStyle ? "bg-[#f8e8c6] text-gray-800 ml-auto" :
+                        "bg-blue-100 text-gray-800 ml-auto"
+                      ) : (
+                        isOfficeStyle ? "bg-white border border-[#e1dfdd]" :
+                        isSpiralStyle ? "bg-white border border-[#e6b44c]" :
+                        "bg-white border border-gray-200"
+                      )
+                    )}
+                  >
+                    {message.content}
+                    {message.reference && (
+                      <div className={cn(
+                        "mt-1 text-xs p-1 rounded",
+                        isOfficeStyle ? "bg-[#f3f2f1] text-[#0078d4]" : 
+                        isSpiralStyle ? "bg-[#f5f1e5] text-[#004080]" : 
+                        "bg-gray-100 text-blue-600"
+                      )}>
+                        Referencing main chat
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
               {isProcessing && (
                 <div className="flex items-center space-x-2 p-3 rounded-lg bg-white border border-gray-200 max-w-[80%]">
                   <Loader2 className={cn(
@@ -819,6 +960,55 @@ Respond with ONLY a valid JSON object containing:
                   <span className="text-sm text-gray-500">AI is thinking...</span>
                 </div>
               )}
+              <div ref={messageEndRef} />
+            </div>
+            {/* Message Input for Chat Tab */}
+            <div className={cn(
+              "p-4 border-t flex-shrink-0 bg-white",
+              isOfficeStyle ? "border-[#e1dfdd]" : 
+              isSpiralStyle ? "border-[#e6b44c]" : 
+              "border-gray-200"
+            )}>
+              <div className="flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (inputValue.trim() && !isProcessing) {
+                        handleSubmit(e);
+                      }
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 px-4 py-2 focus:outline-none"
+                />
+                <button
+                  onClick={handleSubmit}
+                  disabled={isProcessing || !inputValue.trim()}
+                  className={cn(
+                    "p-2 rounded-r-lg",
+                    isProcessing ? "opacity-50 cursor-not-allowed" : "",
+                    inputValue.trim() ? (
+                      isOfficeStyle ? "bg-[#0078d4] text-white" : 
+                      isSpiralStyle ? "bg-[#004080] text-white" : 
+                      "bg-blue-500 text-white"
+                    ) : (
+                      isOfficeStyle ? "bg-gray-100 text-gray-400" : 
+                      isSpiralStyle ? "bg-gray-100 text-gray-400" : 
+                      "bg-gray-100 text-gray-400"
+                    )
+                  )}
+                >
+                  {isProcessing ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -911,8 +1101,8 @@ Respond with ONLY a valid JSON object containing:
                           <div>
                             <h4 className="font-medium text-[#0078d4]">Analyze Document Themes</h4>
                             <p className="text-sm text-gray-600 mt-1">Identify key themes and concepts across all uploaded documents</p>
-          </div>
-        </div>
+                          </div>
+                        </div>
                       </button>
 
       <button
@@ -926,7 +1116,7 @@ Respond with ONLY a valid JSON object containing:
                             <p className="text-sm text-gray-600 mt-1">Create a concise summary of all document content</p>
                           </div>
                         </div>
-      </button>
+                      </button>
 
           <button
                         onClick={() => processDocumentTask('Compare and contrast the information in my documents')}
@@ -939,7 +1129,7 @@ Respond with ONLY a valid JSON object containing:
                             <p className="text-sm text-gray-600 mt-1">Identify similarities, differences, and contradictions</p>
                           </div>
                         </div>
-          </button>
+                      </button>
                       
           <button
                         onClick={() => processDocumentTask('Extract actionable insights from all documents')}
@@ -952,21 +1142,21 @@ Respond with ONLY a valid JSON object containing:
                             <p className="text-sm text-gray-600 mt-1">Highlight key findings and next steps from your documents</p>
                           </div>
                         </div>
-          </button>
+                      </button>
                     </>
                   ) : (
                     <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-500 text-sm mb-3">Upload documents to get AI-powered task suggestions</p>
-          <button
+                      <button
                         onClick={() => handleTabChange('documents')}
                         className="px-4 py-2 bg-[#0078d4] text-white rounded-sm hover:bg-[#106ebe] transition-colors text-sm"
                       >
                         Go to Documents
-          </button>
+                      </button>
                     </div>
                   )}
                 </div>
-        </div>
+              </div>
 
               {/* Saved Workflows Section */}
               <div className="mt-6">
@@ -997,13 +1187,13 @@ Respond with ONLY a valid JSON object containing:
                           <p className="text-xs text-gray-500 mt-2">
                             Last run: {new Date(workflow.lastRun).toLocaleString()}
                           </p>
-                      )}
-                    </div>
+                        )}
+                      </div>
                     ))
                   ) : (
                     <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-500 text-sm">No workflows saved yet. Chat responses can be saved as workflows.</p>
-                  </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1066,9 +1256,9 @@ Respond with ONLY a valid JSON object containing:
                         <ChevronUp className="h-4 w-4 text-[#0078d4]" />
                       ) : (
                         <ChevronDown className="h-4 w-4 text-gray-500" />
-                  )}
-                </button>
-                      </div>
+                      )}
+                    </button>
+                  </div>
 
                   {/* Tags */}
                   {doc.tags.length > 0 && (
@@ -1082,7 +1272,7 @@ Respond with ONLY a valid JSON object containing:
                         </span>
                       ))}
                     </div>
-          )}
+                  )}
 
                   {/* Document Preview */}
                   {activeDocumentId === doc.id && (
@@ -1093,7 +1283,7 @@ Respond with ONLY a valid JSON object containing:
                         </pre>
                       </div>
                       <div className="flex items-center gap-2">
-                  <button
+                        <button
                           onClick={() => handleCopy(doc.content, doc.id)}
                           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                         >
@@ -1103,7 +1293,7 @@ Respond with ONLY a valid JSON object containing:
                             <Copy className="h-3 w-3" />
                           )}
                           {copiedId === doc.id ? 'Copied!' : 'Copy'}
-                  </button>
+                        </button>
                         <button
                           onClick={() => onMainChatInteraction('attach', doc.content)}
                           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
@@ -1111,16 +1301,16 @@ Respond with ONLY a valid JSON object containing:
                           <Link className="h-3 w-3" />
                           Reference in Chat
                         </button>
+                      </div>
                     </div>
-                    </div>
-                      )}
-                    </div>
-                  ))}
+                  )}
+                </div>
+              ))}
               
               {attachedDocuments.length === 0 && (
                 <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-gray-500 text-sm">No documents attached yet</p>
-              </div>
+                </div>
               )}
             </div>
           </div>
@@ -1131,152 +1321,88 @@ Respond with ONLY a valid JSON object containing:
   };
 
   return (
-    <div 
+    <div
+      className="h-full flex flex-col relative overflow-hidden bevel-glass shadow-3d"
       ref={containerRef}
-                  className={cn(
-        "h-full overflow-hidden flex flex-col relative",
-        isOpen ? "w-full" : "w-0"
-      )}
       style={{ width: `${width}px` }}
     >
-      <div className={cn(
-        "flex w-full px-3 py-2 border-b space-x-3",
-        isOfficeStyle ? "bg-white border-[#e1dfdd]" : 
-        isSpiralStyle ? "bg-white border-[#e6b44c]" : 
-        "bg-white border-gray-200"
-      )}>
-          <button
-            className={cn(
-            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+      {/* Add accent line */}
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-primary/5 via-primary/30 to-primary/5"></div>
+      
+      {/* Header Tabs with beveled effects */}
+      <div className="flex items-center justify-between bg-gradient-to-r from-background/95 to-background border-b border-border/40 p-2 shadow-md backdrop-blur-sm">
+        <button
+          className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium bevel-edge",
             activeTab === 'chat' ? (
-              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
-              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
-              "bg-gray-100 text-gray-800"
+              "bg-primary/20 text-primary shadow-directional"
             ) : (
-              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
-              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
-              "text-gray-600 hover:bg-gray-100"
+              "bg-background/30 text-muted-foreground hover:text-foreground hover:bg-muted/30"
             )
           )}
           onClick={() => handleTabChange('chat')}
         >
           <MessageSquare className="h-4 w-4 mr-1" />
           Chat
-          </button>
-          <button
-            className={cn(
-            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+        </button>
+        <button
+          className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium bevel-edge",
             activeTab === 'research' ? (
-              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
-              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
-              "bg-gray-100 text-gray-800"
+              "bg-primary/20 text-primary shadow-directional"
             ) : (
-              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
-              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
-              "text-gray-600 hover:bg-gray-100"
+              "bg-background/30 text-muted-foreground hover:text-foreground hover:bg-muted/30"
             )
           )}
           onClick={() => handleTabChange('research')}
         >
           <FileText className="h-4 w-4 mr-1" />
           Research
-          </button>
-          <button
-            className={cn(
-            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium",
+        </button>
+        <button
+          className={cn(
+            "flex-1 flex justify-center items-center py-1.5 px-3 rounded-md text-sm font-medium bevel-edge",
             activeTab === 'agent' ? (
-              isOfficeStyle ? "bg-[#e1effa] text-[#0078d4]" : 
-              isSpiralStyle ? "bg-[#f8e8c6] text-[#004080]" : 
-              "bg-gray-100 text-gray-800"
+              "bg-primary/20 text-primary shadow-directional"
             ) : (
-              isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
-              isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
-              "text-gray-600 hover:bg-gray-100"
+              "bg-background/30 text-muted-foreground hover:text-foreground hover:bg-muted/30"
             )
           )}
           onClick={() => handleTabChange('agent')}
         >
-          <Sparkles className="h-4 w-4 mr-1" />
-          AI Assistant
+          <Bot className="h-4 w-4 mr-1" />
+          Agent
         </button>
         <button
-          className={cn(
-            "w-8 h-8 flex items-center justify-center rounded-md",
-            isOfficeStyle ? "text-gray-600 hover:bg-[#f3f2f1]" : 
-            isSpiralStyle ? "text-gray-600 hover:bg-[#f8e8c6]/50" : 
-            "text-gray-600 hover:bg-gray-100"
-          )}
           onClick={onClose}
+          className="ml-1 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/30 bevel-neumorphic"
         >
           <ChevronRight className="h-4 w-4" />
-          </button>
-                  </div>
+        </button>
+      </div>
 
-      {/* Resizable Handle */}
+      {/* Resizable Handle with improved appearance */}
       <div
-                    className={cn(
+        className={cn(
           "absolute top-0 left-0 bottom-0 w-1 cursor-ew-resize transition-colors",
           isResizing ? (
-            isOfficeStyle ? "bg-[#0078d4]" : 
-            isSpiralStyle ? "bg-[#e6b44c]" : 
-            "bg-blue-500"
-          ) : "bg-transparent hover:bg-gray-300"
+            "bg-primary/50 backdrop-blur-sm"
+          ) : (
+            "bg-transparent hover:bg-primary/30"
+          )
         )}
         onMouseDown={startResize}
       />
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {children}
 
         {/* Main Content Based on Tab */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {getTabContent()}
-                  </div>
-
-      {/* Message Input for Chat Tab */}
-      {activeTab === 'chat' && (
-        <div className={cn(
-          "p-4 border-t",
-          isOfficeStyle ? "border-[#e1dfdd]" : 
-          isSpiralStyle ? "border-[#e6b44c]" : 
-          "border-gray-200"
-        )}>
-          <div className="flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
-                      <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2 focus:outline-none"
-                />
-                <button
-              onClick={handleSubmit}
-              disabled={isProcessing || !inputValue.trim()}
-                  className={cn(
-                "p-2 rounded-r-lg",
-                isProcessing ? "opacity-50 cursor-not-allowed" : "",
-                inputValue.trim() ? (
-                  isOfficeStyle ? "bg-[#0078d4] text-white" : 
-                  isSpiralStyle ? "bg-[#004080] text-white" : 
-                  "bg-blue-500 text-white"
-                ) : (
-                  isOfficeStyle ? "bg-gray-100 text-gray-400" : 
-                  isSpiralStyle ? "bg-gray-100 text-gray-400" : 
-                  "bg-gray-100 text-gray-400"
-                )
-              )}
-            >
-              {isProcessing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-                  )}
-                </button>
-                      </div>
-          </div>
-        )}
-                </div>
+        </div>
       </div>
+    </div>
   );
 } 

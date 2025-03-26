@@ -8,8 +8,6 @@ const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal
 
-const DropdownMenuClose = DropdownMenuPrimitive.Close
-
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
@@ -19,9 +17,13 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "z-[90] min-w-[8rem] overflow-hidden rounded-md border bg-background/95 backdrop-blur-md p-1 text-foreground shadow-3d bevel-glass animate-in data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
+      style={{
+        overscrollBehavior: "contain",
+        maxHeight: "calc(100vh - 100px)",
+      }}
       {...props}
     />
   </DropdownMenuPrimitive.Portal>
@@ -75,5 +77,4 @@ export {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuPortal,
-  DropdownMenuClose,
 } 

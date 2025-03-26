@@ -1,21 +1,55 @@
 import { useEffect } from 'react';
-import MainLayout from './components/layout/MainLayout';
 import { useThemeStore } from './stores/theme/themeStore';
 import { useNotification } from './components/ui/Notification';
 import { Button } from './components/ui/button';
 import AppInit from './components/AppInit';
 import { ToastProvider } from './components/ui/toast';
+import { AuthProvider } from './contexts/AuthContext';
+import AppRouter from './router/AppRouter';
 
 function App() {
   const { mode, profile, setMode, setProfile } = useThemeStore();
   const { show, NotificationsContainer } = useNotification();
 
+  // Check for system dark mode preference on initial load
+  useEffect(() => {
+    if (mode === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const systemMode = prefersDark ? 'dark' : 'light';
+      
+      // Apply the system preference to the document
+      document.documentElement.classList.toggle('dark', systemMode === 'dark');
+      document.documentElement.style.colorScheme = systemMode === 'dark' ? 'dark' : 'light';
+      
+      // Listen for system preference changes
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e: MediaQueryListEvent) => {
+        document.documentElement.classList.toggle('dark', e.matches);
+        document.documentElement.style.colorScheme = e.matches ? 'dark' : 'light';
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, []);
+
   // Apply theme on mount and when it changes
   useEffect(() => {
-    document.documentElement.classList.remove('dark');
-    document.documentElement.classList.toggle('dark', mode === 'dark');
+    if (mode !== 'system') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.toggle('dark', mode === 'dark');
+      document.documentElement.style.colorScheme = mode === 'dark' ? 'dark' : 'light';
+    }
+    
+    // Always apply the profile attribute regardless of mode
     document.documentElement.setAttribute('data-theme', profile);
-    document.documentElement.style.colorScheme = mode === 'dark' ? 'dark' : 'light';
+    
+    // Apply dark mode classes to body for broader compatibility
+    if (mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
   }, [mode, profile]);
 
   // Display a welcome notification when changing theme
@@ -40,12 +74,25 @@ function App() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log(
+        '%cReact DevTools Available',
+        'color: #61dafb; font-size: 14px; font-weight: bold;',
+        '\nDownload the React DevTools for a better development experience:',
+        'https://reactjs.org/link/react-devtools'
+      );
+    }
+  }, []);
+
   return (
-    <ToastProvider>
-      <AppInit />
-      <MainLayout />
-      <NotificationsContainer />
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <AppInit />
+        <AppRouter />
+        <NotificationsContainer />
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 
